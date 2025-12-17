@@ -1,0 +1,1314 @@
+{#- This file contains the mapping with dmp.eosc.cz:czech-nrp-km object -#}
+{%- import "src/mapping/prepare-data.j2" as json with context -%}
+{%- import "src/mapping/object.j2" as obj with context -%}
+{%- set dc = ctx|to_context_obj -%}
+{%- set data = obj.result -%}
+{%- import "src/macros.html.j2" as macros with context -%}
+{%- import "src/globals.j2" as globals with context -%}
+
+{# Top lvl object is DMP which consist of distinct datasets #}
+
+{#- CCMM variables -#}
+{%- set ccmmDescription = "This CCMM has been created using " ~ globals.fullName ~ " (" ~ globals.link ~ ") and is based on knowledge model " ~ ctx.package.name ~ " (" ~ [ctx.package.organizationId, ctx.package.kmId, ctx.package.version]|join(":") ~ "). The questionnaire used for this DMP is identified by UUID \"" ~ ctx.questionnaire.uuid ~ "\" within " ~ ctx.config.clientUrl ~ " " ~ globals.name ~ " instance." -%}
+{%- set ccmmDmpId = {
+  "identifier": ctx.config.clientUrl ~ "/projects/" ~ ctx.questionnaire.uuid,
+  "type": "url"
+}
+-%}
+
+{#- Contributors and contact -#}
+{%- set contributors = [] -%}
+{%- set contacts = [] -%}
+{%- for contributorItem in data.dmp.collaboration.contributors -%}
+  {%- set contributor = {
+    "contributor_id": {},
+    "name": "",
+    "role": [],
+  } -%}
+  {%- if contributorItem.name -%}
+    {%- do contributor.update({"name": contributorItem.name._value|default("")}) -%}
+  {%- endif -%}
+  {%- if contributorItem.roles -%}
+    {%- do contributor.update({"role": contributorItem.roles|default([])}) -%}
+  {%- endif -%}
+  {%- if contributorItem.orcid -%}
+    {%- if contributorItem.orcid._raw -%}
+      {%- do contributor.update({"contributor_id": {
+        "identifier": contributorItem.orcid._raw['orcid-id'],
+        "type": "orcid"
+      }}) -%}
+    {%- else -%}
+      {%- do contributor.update({"contributor_id": {
+        "identifier": contributorItem.orcid._value|default(""),
+        "type": "other"
+      }}) -%}
+    {%- endif -%}
+  {%- else -%}
+    {%- do contributor.update({"contributor_id": {
+      "identifier": "",
+      "type": "other"
+    }}) -%}
+  {%- endif -%}
+  {%- if contributorItem.email -%}
+    {%- do contributor.update({"mbox": contributorItem.email._value|default("")}) -%}
+  {%- endif -%}
+  {%- do contributors.append(contributor) -%}
+  {%- if contributor.role is defined and "Contact Person" in contributor.role -%}
+    {%- do contacts.append(contributor) -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{#- Costs -#}
+{%- set costs = [] -%}
+{%- for project in data.dmp.projects -%}
+  {%- for costItem in project.costs -%}
+    {%- set cost = {
+      "title": "",
+    } -%}
+    {%- if costItem.title -%}
+      {%- do cost.update({"title": costItem.title._value|default("")}) -%}
+    {%- endif -%}
+
+    {%- if costItem.amount -%}
+      {%- do cost.update({"value": costItem.amount._value|int}) -%}
+    {%- endif -%}
+
+    {%- if costItem.currency._raw -%}
+      {%- do cost.update({"currency_code": costItem.currency._raw.code}) -%}
+    {%- endif -%}
+
+    {%- if costItem.description -%}
+      {%- do cost.update({"description": costItem.description._value}) -%}
+    {%- endif -%}
+
+    {%- if costItem.allocation|length > 0 -%}
+      {%- set allocationSentence = [] -%}
+      {%- set allocations = [] -%}
+      {%- for allocation in costItem.allocation -%}
+        {%- set allocation = macros.lowerFirstLetter(allocation) -%}
+        {%- do allocations.append(allocation) -%}
+      {%- endfor -%}
+      {%- do allocationSentence.append("This resource is allocated for ") -%}
+      {%- if allocations|length > 2 -%}
+        {%- do allocationSentence.append(allocations[0:-1]|join(", ") ~ ", and " ~ allocations[-1]) -%}
+      {%- elif allocations|length == 2 -%}
+        {%- do allocationSentence.append(allocations[0] ~ " and " ~ allocations[1]) -%}
+      {%- else -%}
+        {%- do allocationSentence.append(allocations[0]) -%}
+      {%- endif -%}
+      {%- if costItem.description -%}
+        {%- set descriptionSentence = costItem.description._value|default("") -%}
+      {%- endif -%}
+      {%- set newDescription = (descriptionSentence ~ " "  if descriptionSentence else "") ~ (allocationSentence|join("") if allocationSentence|length > 0 else "") -%}
+      {%- do cost.update({"description": newDescription}) -%}
+    {%- endif -%}
+    {%- do costs.append(cost) -%}
+  {%- endfor -%}
+{%- endfor -%}
+
+{# Datasets (reused) #}
+{%- set datasets = [] -%}
+{%- if data.dmp.reusingData -%}
+  {%- for reusedDatasetItem in data.dmp.reusingData.consideredDatasets -%}
+    {%- if reusedDatasetItem.isReused is defined and reusedDatasetItem.isReused._value is sameas true -%}
+      {# TODO add "is_reused": True, once new version of rda dcs #}
+      {%- set reusedDataset = {
+        "dataset_id": {
+          "identifier": "",
+          "type": "url"
+        },
+        "personal_data": "unknown",
+        "sensitive_data": "unknown",
+      } -%}
+      {%- if reusedDatasetItem.identifier -%}
+        {%- do reusedDataset.dataset_id.update({"identifier": reusedDatasetItem.identifier._value|default("")}) -%}
+      {%- endif -%}
+      {%- if reusedDatasetItem.name -%}
+        {%- if reusedDatasetItem.name._raw -%}
+          {%- do reusedDataset.update({"title": reusedDatasetItem.name._raw.name|default("")}) -%}
+        {%- else -%}
+          {%- do reusedDataset.update({"title": reusedDatasetItem.name._value|default("")}) -%}
+        {%- endif -%}
+      {%- else -%}
+        {%- do reusedDataset.update({"title": ""}) -%}
+      {%- endif -%}
+      {%- if reusedDatasetItem.isReused -%}
+        {%- if reusedDatasetItem.isReused.isSensitiveData is defined -%}
+          {%- if reusedDatasetItem.isReused.isSensitiveData._value is sameas true -%}
+            {%- do reusedDataset.update({"sensitive_data": "yes"}) -%}
+            {%- if reusedDatasetItem.isReused.isSensitiveData.isPersonalData -%}
+              {%- if reusedDatasetItem.isReused.isSensitiveData.isPersonalData._value is sameas true -%}
+                {%- do reusedDataset.update({"personal_data": "yes"}) -%}
+              {%- elif reusedDatasetItem.isReused.isSensitiveData.isPersonalData._value is sameas false -%}
+                {%- do reusedDataset.update({"personal_data": "no"}) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- elif reusedDatasetItem.isReused.isSensitiveData._value is sameas false -%}
+            {%- do reusedDataset.update({"sensitive_data": "no"}) -%}
+            {%- do reusedDataset.update({"personal_data": "no"}) -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+
+      {%- set technicalResources = [] -%}
+      {%- for toolItem in reusedDatasetItem.tools -%}
+        {%- set tool = {
+          "title": "",
+          "description": "",
+        } -%}
+        {%- if toolItem.name -%}
+          {%- do tool.update({"name": toolItem.name._value|default("")}) -%}
+        {%- endif -%}
+        {%- if toolItem.description -%}
+          {%- do tool.update({"description": toolItem.description._value|default("")}) -%}
+        {%- endif -%}
+        {%- do technicalResources.append(tool) -%}
+      {%- endfor -%}
+
+      {%- if technicalResources|length > 0 -%}
+        {%- do reusedDataset.update({"technical_resource": technicalResources}) -%}
+      {%- endif -%}
+
+      {%- do datasets.append(reusedDataset) -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+
+{#- Datasets (produced) -#}
+{%- for datasetItem in data.dmp.datasets -%}
+  {%- set dataset = {
+    "sensitive_data": "unknown",
+    "personal_data": "unknown",
+  } -%}
+  {%- if datasetItem.name -%}
+    {%- if datasetItem.name._raw -%}
+      {%- do dataset.update({"title": datasetItem.name._raw.name|default("")}) -%}
+    {%- else -%}
+      {%- do dataset.update({"title": datasetItem.name._value|default("")}) -%}
+    {%- endif -%}
+  {%- else -%}
+    {%- do dataset.update({"title": ""}) -%}
+  {%- endif -%}
+
+  {# Collection #}
+  {%- if data.dmp.sharedResources.collections|length > 0 -%}
+    {%- set collectionList = [] -%}
+    {%- for collection in data.dmp.sharedResources.collections -%}
+      {%- if collection.usedBy and (datasetItem.uuid in collection.usedBy) -%}
+        {%- do collectionList.append(collection) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- set collection = collectionList[0] -%}
+
+    {#- Sensitive and Personal Data -#}
+    {%- if collection -%}
+      {%- if collection.isSensitiveDataCollection is defined -%}
+        {%- if collection.isSensitiveDataCollection._value is sameas true -%}
+          {%- do dataset.update({"sensitive_data": "yes"}) -%}
+          {%- if collection.sensitiveDataCollection.isPersonalDataCollection is defined -%}
+            {%- if collection.sensitiveDataCollection.isPersonalDataCollection._value is sameas true -%}
+              {%- do dataset.update({"personal_data": "yes"}) -%}
+            {%- elif collection.sensitiveDataCollection.isPersonalDataCollection._value is sameas false -%}
+              {%- do dataset.update({"personal_data": "no"}) -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- elif collection.isSensitiveDataCollection._value is sameas false -%}
+          {%- do dataset.update({"sensitive_data": "no"}) -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    {#- Data Quality Assurance -#}
+    {%- if collection -%}
+      {%- if collection.isEquipmentCollection -%}
+        {%- if collection.isEquipmentCollection._value is sameas true -%}
+          {%- if collection.equipmentCollection.usesQualityProcesses -%}
+            {%- if collection.equipmentCollection.usesQualityProcesses._value is sameas true -%}
+              {%- set processMap = {
+                "calibration": "Calibration of equipment",
+                "repeatSamples": "Repeat samples",
+                "standardizedMethods": "Standardized methods",
+                "dataEntryValidation": "Data entry validation",
+                "dataPeerReview": "Peer review",
+                "usesControlledVocabularies": "Controlled vocabularies",
+                "knownOutcomeSamples": "Known outcome samples"
+              } -%}
+              {%- set enabledProcesses = [] -%}
+              {%- for key, label in processMap.items() -%}
+                {%- if collection.equipmentCollection.qualityProcesses[key]._value is sameas true -%}
+                  {%- do enabledProcesses.append(label) -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- if collection.equipmentCollection.qualityProcesses.otherQualityProcesses._value -%}
+                {%- do enabledProcesses.append(collection.equipmentCollection.qualityProcesses.otherQualityProcesses._value) -%}
+              {%- endif -%}
+              {%- if enabledProcesses|length > 0 -%}
+                {%- do dataset.update({"data_quality_assurance": enabledProcesses}) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {# Type #}
+  {%- if datasetItem.type -%}
+    {%- do dataset.update({"type": datasetItem.type._value}) -%}
+  {%- endif -%}
+
+  {# Identifiers #}
+  {%- set identifiers = [] -%}
+  {%- for identifierItem in datasetItem.identifiers -%}
+    {# Mapping identifier types of FAIRsharing IDs to specific values of controlled vocabulary #}
+    {%- set idType = "other" -%}
+    {%- if identifierItem.type -%}
+      {%- if identifierItem.type._raw -%}
+        {%- if identifierItem.type._raw.id == "317" -%}
+          {%- set idType = "ark" -%}
+        {%- elif identifierItem.type._raw.id == "1538" -%}
+          {%- set idType = "handle" -%}
+        {%- elif identifierItem.type._raw.id == "1332" -%}
+          {%- set idType = "doi" -%}
+        {%- elif identifierItem.type._raw.id == "709" -%}
+          {%- set idType = "url" -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+    {%- set identifier = {
+      "identifier": "",
+      "type": idType,
+    } -%}
+    {%- if identifierItem.value -%}
+      {%- do identifier.update({"identifier": identifierItem.value._value|default("")}) -%}
+    {%- endif -%}
+    {%- do identifiers.append(identifier) -%}
+  {%- endfor -%}
+
+  {#- Only one ID possible -#}
+  {%- if identifiers|length > 0 -%}
+    {%- do dataset.update({"dataset_id": identifiers[0]}) -%}
+  {%- else -%}
+    {%- do dataset.update({"dataset_id": {"identifier": "", "type": "other"}}) -%}
+  {%- endif -%}
+
+  {#- Description -#}
+  {%- if datasetItem.description -%}
+    {%- do dataset.update({"description": datasetItem.description._value|default("")}) -%}
+  {%- endif -%}
+
+  {#- Distributions - nested -#}
+  {%- set distributions = [] -%}
+  {%- for distributionItem in datasetItem.distributions -%}
+    {%- set distribution = {
+      "title": "",
+      "data_access": "",
+    } -%}
+    {%- if distributionItem.name -%}
+      {%- do distribution.update({"title": distributionItem.name._value|default("")}) -%}
+    {%- endif -%}
+    {%- if distributionItem.description -%}
+      {%- do distribution.update({"description": distributionItem.description._value|default("")}) -%}
+    {%- endif -%}
+    {%- if distributionItem.technicalAvailability and distributionItem.technicalAvailability.accessUrl -%}
+      {%- if distributionItem.technicalAvailability.accessUrl._value.startswith("http") -%}
+        {%- do distribution.update({
+          "access_url": distributionItem.technicalAvailability.accessUrl._value|default("")
+        }) -%}
+      {%- endif -%}
+      {%- if distributionItem.technicalAvailability.downloadUrl -%}
+        {%- if distributionItem.technicalAvailability.downloadUrl._value.startswith("http")  -%}
+          {%- do distribution.update({
+            "download_url": distributionItem.technicalAvailability.downloadUrl._value|default("")
+          }) -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- if distributionItem.technicalAvailability.accessMode -%}
+        {%- do distribution.update({
+          "data_access": distributionItem.technicalAvailability.accessMode._value|default("")
+        }) -%}
+      {%- endif -%}
+    {%- endif -%}
+    {%- if distributionItem.whenAvailable -%}
+      {%- if distributionItem.whenAvailable.endDate -%}
+        {%- do distribution.update({
+            "available_until": distributionItem.whenAvailable.endDate._value|default("")
+        }) -%}
+      {%- endif -%}
+    {%- endif -%}
+    {%- if distributionItem.dataVolume -%}
+      {%- if distributionItem.dataVolume.isLargeVolume -%}
+        {%- if distributionItem.dataVolume.isLargeVolume._value is sameas true and distributionItem.dataVolume.largeVolume.estimatedVolume -%}
+          {%- set volume = distributionItem.dataVolume.largeVolume.estimatedVolume._value-%}
+          {%- do distribution.update({"byte_size": (volume | int) * 1000000000}) -%} 
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+    {# Formats #}
+    {%- set formats = [] -%}
+    {%- for format in distributionItem.formats -%}
+      {%- if format.name and format.name._value -%}
+        {%- if format.name._raw -%}
+          {%- do formats.append(format.name._raw.name) -%}
+        {%- else -%}
+          {%- do formats.append(format.name._value) -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if formats|length > 0 -%}
+      {%- do distribution.update({"format": formats}) -%}
+    {%- endif -%}
+
+    {# Licenses #}
+    {%- if distributionItem.licensing -%}
+      {%- if distributionItem.licensing.isLicenseChosen -%}
+        {%- if distributionItem.licensing.isLicenseChosen._value is sameas true -%}
+          {%- set licenses = [] -%}
+          {%- for licenseItem in distributionItem.licensing.licenses -%}
+            {%- set license = {
+              "start_date": "",
+            } -%}
+            {%- if licenseItem.startDate -%}
+              {%- do license.update({"start_date": licenseItem.startDate._value|default("")}) -%}
+            {%- endif -%}
+            {%- if licenseItem.license  -%}
+              {%- if licenseItem.license._raw -%}
+                {%- do license.update({"license_ref": licenseItem.license._raw.name|default("")}) -%}
+              {%- else -%}
+                {%- do license.update({"license_ref": licenseItem.license._value|default("")}) -%}
+              {%- endif -%}
+            {%- else -%}
+              {%- do license.update({"license_ref": ""}) -%}
+            {%- endif -%}
+            {%- do licenses.append(license) -%}
+          {%- endfor -%}
+          {%- if licenses|length > 0 -%}
+            {%- do distribution.update({"license": licenses}) -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    {# Host #}
+    {%- if data.dmp.sharedResources.dataStores|length > 0 -%}
+      {%- set dataStorageList = [] -%}
+      {%- for dataStore in data.dmp.sharedResources.dataStores -%}
+        {%- if dataStore.usedBy and (datasetItem.uuid in dataStore.usedBy) -%}
+          {%- do dataStorageList.append(dataStore) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- set dataStorage = dataStorageList[0] -%}
+
+    {%- if dataStorage -%}
+      {%- set host = {
+        "title": "",
+        "url": "",
+      } -%}
+      {%- if dataStorage.name -%}
+        {%- do host.update({"title": dataStorage.name._value|default("")}) -%}
+      {%- endif -%}
+      {%- if dataStorage.url -%}
+        {%- do host.update({"url": dataStorage.url._value|default("")}) -%}
+      {%- endif -%}
+      {%- if dataStorage.availability -%}
+        {%- do host.update({"availability": dataStorage.availability._value|default("")}) -%}
+      {%- endif -%}
+      {%- if dataStorage.description -%}
+        {%- do host.update({"description": dataStorage.description._value|default("")}) -%}
+      {%- endif -%}
+      {%- if dataStorage.geographicalLocation and dataStorage.geographicalLocation._raw -%}
+        {%- do host.update({"geo_location": dataStorage.geographicalLocation._raw.code|default("")}) -%}
+      {%- endif -%}
+      {%- if dataStorage.type -%}
+          {%- do host.update({"storage_type": dataStorage.type._value|default("")}) -%}
+        {%- endif -%}
+      {%- if dataStorage.storage -%}
+        {%- set storage = dataStorage.storage -%}
+        {%- if storage.backupFrequency -%}
+          {%- do host.update({"backup_frequency": storage.backupFrequency._value|default("")}) -%}
+        {%- endif -%}
+        {%- if storage.backupType -%}
+          {%- do host.update({"backup_type": storage.backupType._value|default("")}) -%}
+        {%- endif -%}
+        {# Mapping certificates to specific values of controlled vocabulary #}
+        {%- if storage.isCertified -%}
+          {%- if storage.isCertified._value is sameas true -%}
+            {%- if storage.certification -%}
+              {%- if storage.certification._value == "DIN 31644" -%}
+                {%- do host.update({"certified_with": "din31644"}) -%}
+              {%- elif storage.certification._value == "DINI Certificate for Open Access Repositories and Publication Services 2019" -%}
+                {%- do host.update({"certified_with": "dini-zertifikat"}) -%}
+              {%- elif storage.certification._value == "Certified Data Storage Associate" -%}
+                {%- do host.update({"certified_with": "dsa"}) -%}
+              {%- elif storage.certification._value == "ISO 16363" -%}
+                {%- do host.update({"certified_with": "iso16363"}) -%}
+              {%- elif storage.certification._value == "ISO 16919" -%}
+                {%- do host.update({"certified_with": "iso16919"}) -%}
+              {%- elif storage.certification._value == "TRAC" -%}
+                {%- do host.update({"certified_with": "trac"}) -%}
+              {%- elif storage.certification._value == "World Data System Regular Members" -%}
+                {%- do host.update({"certified_with": "wds"}) -%}
+              {%- elif storage.certification._value == "CoreTrustSeal" -%}
+                {%- do host.update({"certified_with": "coretrustseal"}) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endif -%}
+        {%- if storage.pidSystems|length > 0 -%}
+          {%- set pidSystems = [] -%}
+          {%- for pidSystemItem in storage.pidSystems -%}
+            {# Mapping identifier types of FAIRsharing IDs to specific values of controlled vocabulary #}
+            {%- set pidSystem = "other" -%}
+            {%- if pidSystemItem.pidSystem -%}
+              {%- if pidSystemItem.pidSystem._raw -%}
+                {%- if pidSystemItem.pidSystem._raw.id == "317" -%}
+                  {%- set pidSystem = "ark" -%}
+                {%- elif pidSystemItem.pidSystem._raw.id == "5010" -%}
+                  {%- set pidSystem = "arxiv" -%}
+                {%- elif pidSystemItem.pidSystem._raw.id == "5096" -%}
+                  {%- set pidSystem = "bibcode" -%}
+                {%- elif pidSystemItem.pidSystem._raw.id == "4538" -%}
+                  {%- set pidSystem = "igsn" -%}
+                {%- elif pidSystemItem.pidSystem._raw.id == "5041" -%}
+                  {%- set pidSystem = "pmid" -%}
+                {%- elif pidSystemItem.pidSystem._raw.id == "1538" -%}
+                  {%- set pidSystem = "handle" -%}
+                {%- elif pidSystemItem.pidSystem._raw.id == "1332" -%}
+                  {%- set pidSystem = "doi" -%}
+                {%- elif pidSystemItem.pidSystem._raw.id == "709" -%}
+                  {%- set pidSystem = "url" -%}
+                {%- elif pidSystemItem.pidSystem._raw.id == "1319" -%}
+                  {%- set pidSystem = "purl" -%}
+                {%- elif pidSystemItem.pidSystem._raw.id == "5050" -%}
+                  {%- set pidSystem = "urn" -%}
+                {%- elif pidSystemItem.pidSystem._raw.value == "isbn" -%}
+                  {%- set pidSystem = "isbn" -%}
+                {%- elif pidSystemItem.pidSystem._raw.value == "ean13" -%}
+                  {%- set pidSystem = "ean13" -%}
+                {%- elif pidSystemItem.pidSystem._raw.value == "eissn" -%}
+                  {%- set pidSystem = "eissn" -%}
+                {%- elif pidSystemItem.pidSystem._raw.value == "issn" -%}
+                  {%- set pidSystem = "issn" -%}
+                {%- elif pidSystemItem.pidSystem._raw.value == "istc" -%}
+                  {%- set pidSystem = "istc" -%}
+                {%- elif pidSystemItem.pidSystem._raw.value == "lissn" -%}
+                  {%- set pidSystem = "lissn" -%}
+                {%- elif pidSystemItem.pidSystem._raw.value == "lsid" -%}
+                  {%- set pidSystem = "lsid" -%}
+                {%- elif pidSystemItem.pidSystem._raw.value == "upc" -%}
+                  {%- set pidSystem = "upc" -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endif -%}
+            {%- do pidSystems.append(pidSystem) -%}
+          {%- endfor -%}
+          {%- if pidSystems|length > 0 -%}
+            {%- do host.update({"pid_system": pidSystems|list|default("")}) -%}
+          {%- endif -%}
+        {%- endif -%}
+        {%- if storage.supportsVersioning -%}
+          {%- if storage.supportsVersioning._value is sameas true -%}
+            {%- do host.update({"support_versioning": "yes"}) -%}
+          {%- elif storage.supportsVersioning._value is sameas false -%}
+            {%- do host.update({"support_versioning": "no"}) -%}
+          {%- else -%}
+            {%- do host.update({"support_versioning": "unknown"}) -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- do distribution.update({"host": host}) -%}
+    {%- endif -%}
+
+    {%- do distributions.append(distribution) -%}
+  {%- endfor -%}
+  {%- do dataset.update({"distribution": distributions}) -%}
+
+  {#- Is Reused -#}
+  {# {%- do dataset.update({"is_reused": False}) -%} #}
+
+  {#- Issued -#}
+  {%- if datasetItem.issueDate -%}
+    {%- do dataset.update({"issued": datasetItem.issueDate._value|datetime_format("%Y-%m-%d")}) -%}
+  {%- endif -%}
+
+  {#- Keyword - safer handling (check existence, avoid None, trim, unique) -#}
+  {%- if datasetItem.keywords is defined and datasetItem.keywords|length > 0 -%}
+    {%- set kws = [] -%}
+    {%- for kw in datasetItem.keywords -%}
+      {%- set val = "" -%}
+      {%- if kw is defined -%}
+        {%- if kw._value is defined and kw._value -%}
+          {%- set val = kw._value|trim -%}
+        {%- elif kw._raw is defined and kw._raw.name is defined and kw._raw.name -%}
+          {%- set val = kw._raw.name|trim -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- if val != "" -%}
+        {%- do kws.append(val) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if kws|length > 0 -%}
+      {%- do dataset.update({"keyword": kws|unique|list|default([])}) -%}
+    {%- else -%}
+      {%- do dataset.update({"keyword": []}) -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {#- Language-#}
+  {%- if datasetItem.language -%}
+    {%- if datasetItem.language._raw -%}
+      {%- do dataset.update({"language": datasetItem.language._raw.code|default("")}) -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {#- Metadata -#}
+  {%- if data.dmp.sharedResources.metadataSpecifications|length > 0 -%}
+    {%- set metadataSpecifications = [] -%}
+    {%- for metadataSpecification in data.dmp.sharedResources.metadataSpecifications -%}
+      {%- if metadataSpecification.usedBy and (datasetItem.uuid in metadataSpecification.usedBy) -%}
+        {%- do metadataSpecifications.append(metadataSpecification) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- set metadataSpecification = metadataSpecifications[0] -%}
+
+    {%- if metadataSpecification -%}
+      {%- set metadata = {
+          "metadata_standard_id" : {
+            "identifier": "",
+            "type": "other"
+          },
+      } -%}
+      {%- if metadataSpecification.language._raw -%}
+        {%- do metadata.update({"language": metadataSpecification.language._raw.code}) -%}
+      {%- else -%}
+        {%- do metadata.update({"language": ""}) -%}
+      {%- endif -%}
+      {%- if metadataSpecification.description -%}
+        {%- do metadata.update({"description": metadataSpecification.description._value}) -%}
+      {%- endif -%}
+
+      {#- Metadata standard ID -#}
+      {%- if metadataSpecification.standardMetadata and metadataSpecification.isStandardMetadata._value is sameas true -%}
+        {%- do metadata.metadata_standard_id.update({
+          "identifier": "",
+          "type": "url"
+        }) -%}
+        {%- if metadataSpecification.standardMetadata.identifier -%}
+          {%- do metadata.metadata_standard_id.update({"identifier": metadataSpecification.standardMetadata.identifier._value|default("")}) -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- do dataset.update({"metadata": metadata}) -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {#- Preservation Statement -#}
+  {%- if data.dmp.sharedResources.preservationStrategies|length > 0 -%}
+    {%- set preservationStrategyList = [] -%}
+    {%- for preservationStrategy in data.dmp.sharedResources.preservationStrategies -%}
+      {%- if preservationStrategy.usedBy and (datasetItem.uuid in preservationStrategy.usedBy) -%}
+        {%- do preservationStrategyList.append(preservationStrategy) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- set preservationStrategy = preservationStrategyList[0] -%}
+
+    {%- if preservationStrategy -%}
+      {%- set preservationSummary = [] -%}
+
+      {#- Long-term storage during project -#}
+      {%- if preservationStrategy.usesLongTermStorageDuringProject -%}
+        {% if preservationStrategy.usesLongTermStorageDuringProject._value is sameas true -%}
+          {%- do preservationSummary.append("Long-term storage is used already during the project.") -%}
+          {%- set lts = preservationStrategy.longTermStorageDuringProject -%}
+          {%- if lts.isDataChangingOverTime -%}
+            {%- if lts.isDataChangingOverTime._value is sameas true -%}
+              {%- set changingSentence = "Data changes over time" -%}
+              {%- if lts.dataChangingOverTime.requiresFrequentBackups -%}
+                {%- if lts.dataChangingOverTime.requiresFrequentBackups._value is sameas true -%}
+                  {%- set changingSentence = changingSentence ~ " and frequent backups are required" -%}
+                {%- endif -%}
+              {%- endif -%}
+              {%- if lts.dataChangingOverTime.usesBackupsForHumanErrorRecovery -%}
+                {%- if lts.dataChangingOverTime.usesBackupsForHumanErrorRecovery._value is sameas true -%}
+                  {%- set changingSentence = changingSentence ~ ", with backups also used for human error recovery" -%}
+                {%- endif -%}
+              {%- endif -%}
+              {%- do preservationSummary.append(changingSentence ~ ".") -%}
+            {%- endif -%}
+            {%- if lts.archiveType -%}
+              {%- if lts.archiveType._value == "disk" -%}
+                {%- do preservationSummary.append("The archive is stored on disk.") -%}
+              {%- elif lts.archiveType._value == "tape" -%}
+                {%- do preservationSummary.append("The archive is stored on tape.") -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
+          {%- if lts.isArchiveStoredRemotely -%}
+            {%- if lts.isArchiveStoredRemotely._value is sameas true -%}
+              {%- do preservationSummary.append("Archive is stored remotely.") -%}
+            {%- endif -%}
+          {%- endif -%}
+          {%- if lts.isArchiveSecurityProvided -%}
+            {%- if lts.isArchiveSecurityProvided._value is sameas true -%}
+              {%- set sec = lts.archiveSecurity -%}
+              {%- set securityDetails = [] -%}
+              {%- if sec.isEncrypted -%}
+                {%- if sec.isEncrypted._value is sameas true -%}
+                  {%- do securityDetails.append("encryption") -%}
+                {%- endif -%}
+              {%- endif -%}
+              {%- if sec.isAccessControlled -%}
+                {%- if sec.isKeyAccessClearlyDefined._value is sameas true -%}
+                  {%- do securityDetails.append("clearly defined key access") -%}
+                {%- endif -%}
+              {%- endif -%}
+              {%- if sec.isPhysicalArchiveAccessDefined -%}
+                {%- if sec.isPhysicalArchiveAccessDefined._value is sameas true -%}
+                  {%- do securityDetails.append("defined physical archive access") -%}
+                {%- endif -%}
+              {%- endif -%}
+              {%- if securityDetails|length > 0 -%}
+                {%- set securitySentence = "Archive security is provided, including " ~ securityDetails|join(", ") ~ "." -%}
+              {%- else -%}
+                {%- set securitySentence = "Archive security is provided." -%}
+              {%- endif -%}
+              {%- do preservationSummary.append(securitySentence) -%}
+            {%- endif -%}
+          {%- endif -%}
+          {%- if lts.isArchiveAccessDecided -%}
+            {%- if lts.isArchiveAccessDecided._value is sameas true -%}
+              {%- do preservationSummary.append("Its clear who has access to the archive.") -%}
+            {%- endif -%}
+          {%- endif -%}
+          {%- if lts.isArchivePeriodDefined -%}
+            {%- if lts.isArchivePeriodDefined._value is sameas true and lts.archivePeriod -%}
+              {%- if lts.archivePeriod._value == "until_needs_delete" -%}
+                {%- do preservationSummary.append("Archive period is until it needs to be deleted for legal, contractual or regulatory reasons.") -%}
+              {%- elif lts.archivePeriod._value == "as_long_as_possible" -%}
+                {%- do preservationSummary.append("Archive period is as long as possible.") -%}
+              {%- else -%}
+                {%- do preservationSummary.append("Archive period is " ~ lts.archivePeriod._value) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
+          {%- if lts.isLongTermDataUsabilityEnsured -%}
+            {%- if lts.isLongTermDataUsabilityEnsured._value is sameas true -%}
+              {%- do preservationSummary.append("Long-term data usability is ensured.") -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- elif preservationStrategy.noLongTermStorageDuringProject -%}
+          {%- set noLts = preservationStrategy.noLongTermStorageDuringProject -%}
+          {%- if noLts.canRegenerateOriginalData -%}
+            {%- if noLts.canRegenerateOriginalData._value is sameas true -%}
+              {%- do preservationSummary.append("Original data can be regenerated if needed.") -%}
+            {%- endif -%}
+          {%- endif -%}
+          {%- if noLts.rawDataArchivalTime -%}
+            {%- if noLts.rawDataArchivalTime._value -%}
+              {%- do preservationSummary.append("Raw data archival time is " ~ noLts.rawDataArchivalTime._value) -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+
+      {#- Long-term storage after project -#}
+      {%- if preservationStrategy.usesLongTermStorageAfterProject -%}
+        {%- if preservationStrategy.usesLongTermStorageAfterProject._value is sameas true -%}
+          {%- do preservationSummary.append("The data will be stored long-term after the project.") -%}
+          {%- set ltsAfter = preservationStrategy.longTermStorageAfterProject -%}
+          {%- if ltsAfter.minimumLifeTimeYears -%}
+            {%- if ltsAfter.minimumLifeTimeYears._value -%}
+              {%- do preservationSummary.append("Minimum lifetime is " ~ ltsAfter.minimumLifeTimeYears._value ~ " years.") -%}
+            {%- elif ltsAfter.minimumLifeTimeOther._value -%}
+              {%- do preservationSummary.append("Minimum lifetime is " ~ ltsAfter.minimumLifeTimeOther._value) -%}
+            {%- endif -%}
+          {%- endif -%}
+          {%- if ltsAfter.isArchivalPeriodExtendable -%}
+            {%- if ltsAfter.isArchivalPeriodExtendable._value is sameas true -%}
+              {%- do preservationSummary.append("Archival period is extendable.") -%}
+              {%- set ext = ltsAfter.archivalPeriodExtension -%}
+
+            {%- elif ltsAfter.noArchivalPeriodExtensionReason._value -%}
+              {%- do preservationSummary.append("Archival period is not extendable because " ~ ltsAfter.noArchivalPeriodExtensionReason._value) -%}
+            {%- endif -%}
+          {%- endif -%}
+          {%- if ltsAfter.isFormatUpgradePlanned -%}
+            {%- if ltsAfter.isFormatUpgradePlanned._value is sameas true -%}
+              {%- do preservationSummary.append("Format migration upgrade is planned.") -%}
+            {%- endif -%}
+          {%- endif -%}
+          {%- if ltsAfter.isMediaUpgradePlanned -%}
+            {%- if ltsAfter.isMediaUpgradePlanned._value is sameas true -%}
+              {%- do preservationSummary.append("Media migration upgrade is planned.") -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- elif preservationStrategy.noLongTermStorageAfterProjectReason._value -%}
+          {%- do preservationSummary.append("No long-term storage after project because " ~ preservationStrategy.noLongTermStorageAfterProjectReason._value) -%}
+        {%- endif -%}
+      {%- endif -%}
+
+      {#- Preservation statement document -#}
+      {%- if preservationStrategy.isPreservationStatementDefined -%}
+        {%- if preservationStrategy.isPreservationStatementDefined._value is sameas true -%}
+          {%- set ps = preservationStrategy.preservationStatement -%}
+          {%- if ps.description -%}
+            {%- do preservationSummary.append("Preservation statement is defined and this is its short description: " ~ ps.description._value) -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+
+      {%- if preservationSummary|length > 0 -%}
+        {%- do dataset.update({"preservation_statement": preservationSummary|join(" ")}) -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {#- Security and Privacy -#}
+  {%- if data.dmp.sharedResources.collections|length > 0 -%}
+    {%- set collectionList = [] -%}
+    {%- for collection in data.dmp.sharedResources.collections -%}
+      {%- if collection.usedBy and (datasetItem.uuid in collection.usedBy) -%}
+        {%- do collectionList.append(collection) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- set collection = collectionList[0] -%}
+
+    {%- set securityAndPrivacy = [] -%}
+    {%- if collection -%}
+      {%- if collection.isSensitiveDataCollection is defined -%}
+        {%- if collection.isSensitiveDataCollection._value is sameas true -%}
+          {#- Anonymization -#}
+          {%- if collection.sensitiveDataCollection.isPersonalDataCollection is defined -%}
+            {%- if collection.sensitiveDataCollection.isPersonalDataCollection._value is sameas true -%}
+              {%- set personalData = collection.sensitiveDataCollection.personalDataCollection -%}
+              {%- if personalData.isFullyAnonymized is defined -%}
+                {%- if personalData.isFullyAnonymized._value is sameas true -%}
+                  {%- set techniques = "" -%}
+                  {%- if personalData.anonymizationProcess.anonymizationProcessTechniques and personalData.anonymizationProcess.anonymizationProcessTechniques|length > 0 -%}
+                    {%- set techniqueLabels = [] -%}
+                    {%- for technique in personalData.anonymizationProcess.anonymizationProcessTechniques -%}
+                      {%- set techniqueLabel = macros.lowerFirstLetter(technique._label) -%}
+                      {%- do techniqueLabels.append(techniqueLabel) -%}
+                    {%- endfor -%}
+                    {%- set techniques = " We used the following techniques: " ~ techniqueLabels|join(", ") ~ "." -%}
+                  {%- endif -%}
+                    {%- set anonymization = {
+                      "title": "Anonymization of personal data",
+                      "description": "Data is fully anonymized." ~ techniques,
+                    } -%}
+                    {%- do securityAndPrivacy.append(anonymization) -%}
+
+                {%- elif personalData.isFullyAnonymized._value is sameas false -%}
+                  {%- for dataProcessingSafeguardItem in personalData.nonAnonymizedData.dataProcessingSafeguards -%}
+                    {%- set safeguard = {
+                      "title": "Data processing safeguard for non-anonymized data",
+                      "description": dataProcessingSafeguardItem._label,
+                    } -%}
+                    {%- do securityAndPrivacy.append(safeguard) -%}
+                  {%- endfor -%}
+
+                  {%- if personalData.nonAnonymizedData.isTransferOutsideEu is defined -%}
+                    {%- if personalData.nonAnonymizedData.isTransferOutsideEu._value is sameas true -%}
+                      {%- set transfer = {
+                        "title": "Transfer outside EU",
+                        "description": "Data is transferred outside the EU." ~ (
+                        " Protection process: " ~ personalData.nonAnonymizedData.transferOutsideEuProtectionProcess._value
+                        if personalData.nonAnonymizedData.transferOutsideEuProtectionProcess._value
+                        else ""
+                        ),
+                      } -%}
+                      {%- do securityAndPrivacy.append(transfer) -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endif -%}
+
+            {#- Other Security precautions -#}
+            {%- elif collection.sensitiveDataCollection.isPersonalDataCollection._value is sameas false -%}
+              {%- set otherSensitiveData = collection.sensitiveDataCollection.otherSensitiveDataCollection -%}
+              {%- for securityMeasureItem in otherSensitiveData.securityMeasures -%}
+                {%- set securityMeasure = {
+                  "title": "no title given",
+                } -%}
+                {%- if securityMeasureItem.name -%}
+                  {%- do securityMeasure.update({"title": securityMeasureItem.name._value|default("no title given")}) -%}
+                {%- endif -%}
+                {%- if securityMeasureItem.description -%}
+                  {%- do securityMeasure.update({"description": securityMeasureItem.description._value|default("no description given")}) -%}
+                {%- else -%}
+                  {%- do securityMeasure.update({"description": "no description given"}) -%}
+                {%- endif -%}
+                {%- do securityAndPrivacy.append(securityMeasure) -%}
+              {%- endfor -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    {%- if securityAndPrivacy|length > 0 -%}
+      {%- do dataset.update({"security_and_privacy": securityAndPrivacy}) -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {#- Technical Resources - tools and instruments -#}
+  {%- set technical_resource = [] -%}
+  {%- if data.dmp.sharedResources.collections|length > 0 -%}
+    {%- set collectionList = [] -%}
+    {%- for collection in data.dmp.sharedResources.collections -%}
+      {%- if collection.usedBy and (datasetItem.uuid in collection.usedBy) -%}
+        {%- do collectionList.append(collection) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- set collection = collectionList[0] -%}
+
+    {%- if collection -%}
+      {%- if collection.isEquipmentCollection is defined -%}
+        {%- if collection.isEquipmentCollection._value is sameas true -%}
+          {%- set instruments = collection.equipmentCollection.instruments -%}
+          {%- for instrumentItem in instruments -%}
+            {%- set instrumentDescription = [] -%}
+            {%- if instrumentItem.description -%}
+              {%- do instrumentDescription.append(instrumentItem.description._value) -%}
+            {%- endif -%}
+            {%- if instrumentItem.isStandard is defined -%}
+              {%- if instrumentItem.isStandard._value is sameas true -%}
+                {%- do instrumentDescription.append("This instrument is standard.") -%}
+              {%- endif -%}
+            {%- endif -%}
+            {%- set instrument = {
+              "name": "",
+            } -%}
+            {%- if instrumentItem.name -%}
+              {%- do instrument.update({"name": instrumentItem.name._value|default("")}) -%}
+            {%- endif -%}
+            {%- if instrumentDescription|length > 0 -%}
+              {%- do instrument.update({"description": instrumentDescription|join(" ")}) -%}
+            {%- else -%}
+              {%- do instrument.update({"description": "no description given"}) -%}
+            {%- endif -%}
+
+            {%- do technical_resource.append(instrument) -%}
+          {%- endfor -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- if data.dmp.sharedResources.tools|length > 0 -%}
+    {%- set toolList = [] -%}
+    {%- for tool in data.dmp.sharedResources.tools -%}
+      {%- if tool.usedBy and (datasetItem.uuid in tool.usedBy) -%}
+        {%- do toolList.append(tool) -%}
+      {%- endif -%}
+    {%- endfor -%}
+
+    {%- for tool in toolList -%}
+      {%- set toolDescription = [] -%}
+      {%- set tool = {
+        "name": "",
+      } -%}
+      {%- if tool.name -%}
+        {%- do tool.update({"name": tool.name._value|default("")}) -%}
+      {%- endif -%}
+      {%- if tool.description -%}
+        {%- do toolDescription.append(tool.description._value|default("")) -%}
+      {%- endif -%}
+      {%- if tool.isFreeAndAvailable is defined -%}
+        {%- if tool.isFreeAndAvailable._value is sameas true -%}
+          {%- do toolDescription.append("This tool is free and available.") -%}
+        {%- elif tool.isFreeAndAvailable._value is sameas false -%}
+          {%- do toolDescription.append("This tool is not free and available.") -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- if toolDescription|length > 0 -%}
+        {%- do tool.update({"description": toolDescription|join(" ")}) -%}
+      {%- endif -%}
+      {%- do technical_resource.append(tool) -%}
+    {%- endfor -%}
+  {%- endif -%}
+  {%- if technical_resource|length > 0 -%}
+    {%- do dataset.update({"technical_resource": technical_resource}) -%}
+  {%- endif -%}
+
+  {%- do datasets.append(dataset) -%}
+{%- endfor -%}
+
+{# Ethical Issues #}
+{%- set ethicalIssues = [] -%}
+{%- set ethicalIssuesDescriptions = []  -%}
+{%- set ethicalDocument = [] -%}
+{%- for datasetItem in data.dmp.datasets -%}
+  {%- if datasetItem.name -%}
+    {%- if datasetItem.name._raw -%}
+      {%- set name = datasetItem.name._raw.name -%}
+      {%- set name = name ~ " (" ~ datasetItem.name._raw.url ~ ")" -%}
+    {%- elif datasetItem.name._value -%}
+      {%- set name = datasetItem.name._value -%}
+    {%- endif -%}
+  {%- else -%}
+    {%- set name = "(no name given)" -%}
+  {%- endif -%}
+
+  {%- if data.dmp.sharedResources.collections|length > 0 -%}
+    {%- set collectionList = [] -%}
+    {%- for collection in data.dmp.sharedResources.collections -%}
+      {%- if collection.usedBy and (datasetItem.uuid in collection.usedBy) -%}
+        {%- do collectionList.append(collection) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- set collection = collectionList[0] -%}
+
+    {%- if collection -%}
+      {%- if collection.isSensitiveDataCollection is defined and collection.isSensitiveDataCollection._value is sameas true -%}
+        {%- set sensitiveDataCollection = collection.sensitiveDataCollection -%}
+
+        {%- if sensitiveDataCollection.isPersonalDataCollection is defined and sensitiveDataCollection.isPersonalDataCollection._value is sameas true -%}
+          {%- set personalDataCollection = sensitiveDataCollection.personalDataCollection -%}
+
+          {# Legal base #}
+          {%- do ethicalIssuesDescriptions.append(name ~ " contains personal data.") -%}
+          {%- if personalDataCollection.underLegalBasis is defined -%}
+            {%- if personalDataCollection.underLegalBasis._value == "public_interest" %}
+                {%- do ethicalIssuesDescriptions.append("We collect personal data for the benefit of society, and this is more important than the privacy of the subjects (i.e. public interest).") -%}
+            {%- elif personalDataCollection.underLegalBasis._value == "consent" %}
+                {%- if personalDataCollection.subjectConsent.typeOfConsent %}
+                  {%- set label = personalDataCollection.subjectConsent.typeOfConsent._label %}
+                  {%- do ethicalIssuesDescriptions.append("We ask the data subjects for their consent (" ~ label[:1]|lower ~ label[1:] ~ ").") -%}
+                {%- else -%}
+                  {%- do ethicalIssuesDescriptions.append("We ask the data subjects for their consent") -%}
+                {%- endif -%}
+                {%- if personalDataCollection.subjectConsent.isAvailableForReuse is defined -%}
+                  {%- if personalDataCollection.subjectConsent.isAvailableForReuse._value is sameas true %}
+                      {%- do ethicalIssuesDescriptions.append("The consent form will be available for re-users.") -%}
+                  {%- elif personalDataCollection.subjectConsent.isAvailableForReuse._value is sameas false %}
+                      {%- do ethicalIssuesDescriptions.append("The consent form will not be available for re-users.") -%}
+                  {%- endif -%}
+                {%- endif -%}
+            {%- elif personalDataCollection.underLegalBasis._value == "fulfill_contract" %}
+                {%- do ethicalIssuesDescriptions.append("We collect personal data to fulfill a contract.") -%}
+            {%- elif personalDataCollection.underLegalBasis._value == "legitimate_interest" %}
+                {%- do ethicalIssuesDescriptions.append("We collect personal data based on our legitimate interest.") -%}
+            {%- elif personalDataCollection.underLegalBasis._value == "vital_interest" %}
+                {%- do ethicalIssuesDescriptions.append("We collect personal data based on our legitimate interest.") -%}
+            {%- elif personalDataCollection.underLegalBasis._value == "legal_requirement" %}
+                {%- do ethicalIssuesDescriptions.append("We collect personal data because it is a legal requirement.") -%}
+            {%- elif personalDataCollection.underLegalBasis._value == "public_interest" %}
+                {%- do ethicalIssuesDescriptions.append("We collect personal data based on public interest.") -%}
+            {%- endif -%}
+          {%- endif -%}
+
+          {# Anonymized data #}
+          {%- if personalDataCollection.isFullyAnonymized -%}
+            {%- if personalDataCollection.isFullyAnonymized._value is sameas false -%}
+                {%- set nonAnonymizedDataset = personalDataCollection.nonAnonymizedData -%}
+                {%- if nonAnonymizedDataset.isPseudonymized -%}
+                  {%- if nonAnonymizedDataset.isPseudonymized._value is sameas true %}
+                  {%- do ethicalIssuesDescriptions.append("The data are not fully anonymised, but only pseudoanonymized.") -%}
+                  {%- elif nonAnonymizedDataset.isPseudonymized._value is sameas false -%}
+                      {%- if nonAnonymizedDataset.noPseudonymizationReason %}
+                          {%- do ethicalIssuesDescriptions.append("The dataset is not fully anonymized, and it is not even pseudonymized, because: " ~ nonAnonymizedDataset.noPseudonymizationReason._value ~ ".") -%}
+                      {%- else %}
+                          {%- do ethicalIssuesDescriptions.append("The dataset is not fully anonymized, and it is not even pseudonymized.") -%}
+                      {%- endif -%}
+                  {%- endif -%}
+                {%- endif -%}
+
+                {# DPIA #}
+                {%- if nonAnonymizedDataset.isDpiaRequired -%}
+                  {%- if nonAnonymizedDataset.isDpiaRequired._value is sameas true -%}
+                    {%- if nonAnonymizedDataset.isDpiaPerformedToPersonalData -%}
+                      {%- if nonAnonymizedDataset.isDpiaPerformedToPersonalData._value is sameas true %}
+                          {%- do ethicalIssuesDescriptions.append("DPIA has already been conducted for the personal data.") -%}
+                          {%- if nonAnonymizedDataset.dpia.reasons|length > 0 %}
+                            {%- set reasonLabels = nonAnonymizedDataset.dpia.reasons|map(attribute="_label")|list -%}
+                            {%- do ethicalIssuesDescriptions.append("DPIA is necessary for this project because the following high-risk criteria, as defined by the European Commission, apply: " ~ reasonLabels|join('; ') ~ ".") -%}
+                          {%- endif -%}
+                      {%- else %}
+                          {%- do ethicalIssuesDescriptions.append("We need to conduct a data protection impact assessment (DPIA).") -%}
+                      {%- endif -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endif -%}
+
+            {%- elif personalDataCollection.isFullyAnonymized._value is sameas true -%}
+              {%- set anonymizationProcess = personalDataCollection.anonymizationProcess -%}
+              {%- do ethicalIssuesDescriptions.append("The data are fully anonymized.") -%}
+            {%- endif -%}
+          {%- endif -%}
+
+          {# GDPR category #}
+          {%- if personalDataCollection.categoryGdpr -%}
+            {%- if personalDataCollection.categoryGdpr._value is sameas "standard" -%}
+              {%- do ethicalIssuesDescriptions.append("The personal data we collect falls under GDPR category of standard personal data.") -%}
+            {%- elif personalDataCollection.categoryGdpr and personalDataCollection.categoryGdpr|length > 0 -%}
+                {%- set details= personalDataCollection.categoryGdpr|map(attribute="_label")|list -%}
+                {%- do ethicalIssuesDescriptions.append("The personal data we collect falls under special categories of personal data (" ~ details|join('; ') ~ ").") -%}
+              {%- if personalDataCollection.specialCategoryGdprExemption %}
+                {%- do ethicalIssuesDescriptions.append("The exemption of " ~ personalDataCollection.specialCategoryGdprExemption._value ~ " allows us to process this category of data.") -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
+
+        {%- elif sensitiveDataCollection.isPersonalDataCollection is defined and sensitiveDataCollection.isPersonalDataCollection._value is sameas false -%}
+          {%- set otherSensitiveDataCollection = sensitiveDataCollection.otherSensitiveDataCollection -%}
+          {%- do ethicalIssuesDescriptions.append("Dataset " ~ name ~ " contains sensitive data, but it does not contain personal data.") -%}
+        {%- endif -%}
+
+      {%- elif collection.isSensitiveDataCollection is defined and collection.isSensitiveDataCollection._value is sameas false -%}
+        {%- do ethicalIssuesDescriptions.append("Dataset " ~ name ~ " does not contain sensitive data.") -%}
+      {%- endif -%}
+
+      {# Ethical Review #}
+      {%- if collection.isSubjectToEthicalReview -%}
+        {%- if collection.isSubjectToEthicalReview._value is sameas true -%}
+          {%- set ethicalReview = collection.ethicalReview -%}
+          {%- do ethicalIssuesDescriptions.append("The data collection is subject to ethical legislation.") -%}
+          {%- if ethicalReview.extensionOfReusedData -%}
+            {%- if ethicalReview.extensionOfReusedData._value == "not_applicable" %} 
+                {%- do ethicalIssuesDescriptions.append("A new approval or extension of any existing approval under research ethics laws is not applicable for the re-use of the data.") -%}
+            {%- elif ethicalReview.extensionOfReusedData._value == "existing"  %}
+                {%- do ethicalIssuesDescriptions.append("An existing approval under research ethics laws covers our re-use of the data; no new approval or extension is required.") -%}
+            {%- elif ethicalReview.extensionOfReusedData._value == "extension"  %}
+                {%- do ethicalIssuesDescriptions.append("An extension of an existing approval under research ethics laws will be needed for the re-use of the data.") -%}
+            {%- elif ethicalReview.extensionOfReusedData._value == "new"  %}
+                {%- do ethicalIssuesDescriptions.append("A new ethical approval under research ethics laws will be needed to cover our usage of the data.") -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- elif collection.isSubjectToEthicalReview._value is sameas false -%}
+            {%- do ethicalIssuesDescriptions.append("The data collection is not subject to ethical legislation.") -%}
+        {%- endif -%}
+      {%- endif -%}
+
+      {%- if collection.ethicalReview.ethicalReviewLinkDocument %}
+        {%- do ethicalDocument.append(collection.ethicalReview.ethicalReviewLinkDocument._value) -%}
+      {%- elif collection.ethicalReview.ethicalReviewDocument -%}
+        {%- do ethicalDocument.append(collection.ethicalReview.ethicalReviewDocument._url) -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {# Reuse Restrictions #}
+  {%- if data.dmp.sharedResources.reuseRestrictions|length > 0 -%}
+    {%- set reuseRestrictionList = [] -%}
+    {%- for reuseRestriction in data.dmp.sharedResources.reuseRestrictions -%}
+      {%- if reuseRestriction.usedBy and (dataset.uuid in reuseRestriction.usedBy) -%}
+        {%- do reuseRestrictionList.append(reuseRestriction) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- set reuseRestriction = reuseRestrictionList[0] -%}
+
+    {%- if reuseRestriction -%}
+      {%- if reuseRestriction.accessRestriction -%}
+        {%- set accessRestriction = reuseRestriction.accessRestriction -%}
+        {%- if accessRestriction.canDataOpen -%}
+          {%- if reuseRestriction.accessRestriction.canDataOpen._value is sameas true -%}
+              {%- do ethicalIssuesDescriptions.append("Dataset " ~ name ~ " can become completely open over time") -%}
+          {%- elif reuseRestriction.accessRestriction.canDataOpen._value is sameas false -%}
+            {%- do ethicalIssuesDescriptions.append("Dataset " ~ name ~ " cannot become completely open") -%}
+            {%- set dataCannotOpen = reuseRestriction.accessRestriction.dataCannotOpen -%}
+
+            {%- if dataCannotOpen.isLegalReason -%}
+              {%- if dataCannotOpen.isLegalReason._value is sameas true -%}
+                {%- if dataCannotOpen.legalReason.isPrivacyReason._value is sameas true -%}
+                  {%- do ethicalIssuesDescriptions.append("due to privacy reasons.") -%}
+                  {%- if dataCannotOpen.legalReason.privacyReason -%}
+                    {%- if dataCannotOpen.legalReason.privacyReason.locationOfData._value == "no" %}
+                        {%- do ethicalIssuesDescriptions.append("There are no restrictions where the data can be stored.") -%}
+                    {%- elif dataCannotOpen.legalReason.privacyReason.locationOfData._value == "eu" %}
+                        {%- do ethicalIssuesDescriptions.append("The data must stay in the EU.") -%}  
+                    {%- elif dataCannotOpen.legalReason.privacyReason.locationOfData._value == "country" %}
+                        {%- do ethicalIssuesDescriptions.append("The data must stay in the same country.") -%}
+                    {%- elif dataCannotOpen.legalReason.privacyReason.locationOfData._value == "institute" %}
+                        {%- do ethicalIssuesDescriptions.append("The data must stay in the same institute.") -%}
+                    {%- endif -%}
+                  {%- endif -%}
+
+                  {%- set privacyCanUse = [] -%}
+                  {%- set privacyCannotUse = [] -%}
+                  {%- set privacyReason = dataCannotOpen.legalReason.privacyReason -%}
+                  {%- if privacyReason.howToMoreOpen -%}
+                    {%- if privacyReason.howToMoreOpen.pseudonymization -%}
+                      {%- if privacyReason.howToMoreOpen.pseudonymization._value is sameas false -%}
+                          {%- do privacyCannotUse.append("pseudonymization") -%}
+                      {%- elif privacyReason.howToMoreOpen.pseudonymization._value is sameas true -%}
+                          {%- do privacyCanUse.append("pseudonymization") -%}
+                      {%- endif -%}
+                    {%- endif -%}
+
+                    {%- if privacyReason.howToMoreOpen.anonymization -%}
+                      {%- if privacyReason.howToMoreOpen.anonymization._value is sameas false -%}
+                          {%- do privacyCannotUse.append("anonymization") -%}
+                      {%- elif privacyReason.howToMoreOpen.anonymization._value is sameas true -%}
+                          {%- do privacyCanUse.append("anonymization") -%}
+                      {%- endif -%}
+                    {%- endif -%}
+
+                    {%- if privacyReason.howToMoreOpen.aggregation -%}
+                      {%- if privacyReason.howToMoreOpen.aggregation._value is sameas false -%}
+                          {%- do privacyCannotUse.append("data aggregation") -%}
+                      {%- elif privacyReason.howToMoreOpen.aggregation._value is sameas true -%}
+                          {%- do privacyCanUse.append("data aggregation") -%}
+                      {%- endif -%}
+                    {%- endif -%}
+                  {%- endif -%}
+
+                  {%- if privacyCanUse|length == 1 %}
+                      {%- do ethicalIssuesDescriptions.append("We can use " ~ privacyCanUse[0] ~ " to make the data more openly available.") -%}
+                  {%- elif privacyCanUse|length == 2 %}
+                      {%- do ethicalIssuesDescriptions.append("We can use " ~ privacyCanUse[0] ~ " and " ~ privacyCanUse[1] ~ " to make the data more openly available.") -%}
+                  {%- elif privacyCanUse|length == 3 %}
+                      {%- do ethicalIssuesDescriptions.append("We can use " ~ privacyCanUse[0] ~ ", " ~ privacyCanUse[1] ~ ", and " ~ privacyCanUse[2] ~ " to make the data more openly available.") -%}
+                  {%- endif -%}
+
+                  {%- set privacyCannotUseStart = "We cannot use" if privacyCanUse|length == 0 else "But we cannot use" -%}
+                  {%- if privacyCannotUse|length == 1 %}
+                      {%- do ethicalIssuesDescriptions.append(privacyCannotUseStart ~ " " ~ privacyCannotUse[0] ~ " to make the data more openly available.") -%}
+                  {%- elif privacyCannotUse|length == 2 %}
+                      {%- do ethicalIssuesDescriptions.append(privacyCannotUseStart ~ " neither " ~ privacyCannotUse[0] ~ " nor " ~ privacyCannotUse[1] ~ " to make the data more openly available.") -%}
+                  {%- elif privacyCannotUse|length == 3 %}
+                      {%- do ethicalIssuesDescriptions.append(privacyCannotUseStart ~ " neither " ~ privacyCannotUse[0] ~ " nor " ~ privacyCannotUse[1] ~ ", nor " ~ privacyCannotUse[2] ~ " to make the data more openly available.") -%}
+                  {%- endif -%}
+
+                  {%- if privacyReason.howToMoreOpen.pseudonymization -%}
+                    {%- if privacyReason.howToMoreOpen.pseudonymization._value is sameas true -%}
+                      {%- if privacyReason.howToMoreOpen.useThirdPartyForPseudonymization %}
+                        {%- if privacyReason.howToMoreOpen.useThirdPartyForPseudonymization._value is sameas false %}
+                            {%- do ethicalIssuesDescriptions.append("For pseudonymization, we cannot make use of an existing 'trusted third party'.") -%}
+                        {%- elif privacyReason.howToMoreOpen.useThirdPartyForPseudonymization._value is sameas true %}
+                            {%- do ethicalIssuesDescriptions.append("For pseudonymization, we can make use of an existing 'trusted third party'.") -%}
+                        {%- endif -%}
+                      {%- endif -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{# Projects #}
+{%- set projects = [] -%}
+{#- Projects #}
+{%- for projectItem in data.dmp.projects -%}
+  {%- set project = {
+    "title": "",
+  } -%}
+  {%- if projectItem.name -%}
+    {%- do project.update({"title": projectItem.name._value|default("")}) -%}
+  {%- endif -%}
+  {%- if projectItem.description -%}
+    {% do project.update({"description": projectItem.description._value|default("")}) -%}
+  {%- endif -%}
+  {%- if projectItem.startDate -%}
+    {%- do project.update({"start": projectItem.startDate._value|default("")}) -%}
+  {%- endif -%}
+  {%- if projectItem.endDate -%}
+    {%- do project.update({"end": projectItem.endDate._value|default("")}) -%}
+  {%- endif -%}
+
+  {%- set funding = [] -%}
+  {%- for fundingItem in projectItem.fundings -%}
+    {%- if fundingItem.funder -%}
+      {%- if fundingItem.funder._raw -%}
+        {%- set funder_id = {
+          "identifier": fundingItem.funder._raw.uri|default(""),
+          "type": "other",
+        } -%}
+      {%- else -%}
+        {%- set funder_id = {
+          "identifier": fundingItem.funder._id|default(""),
+          "type": "other",
+        } -%}
+      {%- endif -%}
+    {%- else -%}
+      {%- set funder_id = {
+        "identifier": "",
+        "type": "other",
+      } -%}
+    {%- endif -%}
+    {%- set funding_obj = {
+      "funder_id": funder_id,
+    } -%}
+   {%- if fundingItem.status -%}
+      {%- do funding_obj.update({"funding_status": fundingItem.status._value|default("")}) -%}
+    {%- endif -%}
+    {%- if fundingItem.grantId -%}
+      {%- do funding_obj.update({
+        "grant_id": {
+          "identifier": fundingItem.grantId._value|default(""),
+          "type": "other",
+        }
+      }) -%} 
+    {%- endif -%}
+    {%- do funding.append(funding_obj) -%}
+  {%- endfor -%}
+
+  {%- if funding|length > 0 -%}
+    {%- do project.update({"funding": funding}) -%}
+  {%- endif -%}
+  {%- do projects.append(project) -%}
+{%- endfor -%}
+
+
+{#- DMP internal object -#}
+{%- set dmp = {
+  "title": ctx.questionnaire.name|default(""),
+  "description": ccmmDescription|default(""),
+  "language": "eng",
+  "dmp_id": ccmmDmpId|default(""),
+  "created": ctx.questionnaire.createdAt|datetime_format("%Y-%m-%dT%H:%M:%SZ"),
+  "modified": ctx.questionnaire.updatedAt|datetime_format("%Y-%m-%dT%H:%M:%SZ"),
+  "dataset": datasets|default([]),
+  "ethical_issues_exist": "unknown",
+} -%}
+{# Contributor is not mandatory #}
+{%- if contributors|length > 0 -%}
+  {%- do dmp.update({"contributor": contributors}) -%}
+{%- endif -%}
+
+{#- Only one Contact Person is permitted -#}
+{%- if contacts|length > 0 -%}
+  {%- do dmp.update({"contact": {
+    "contact_id": contacts[0]["contributor_id"],
+    "mbox": contacts[0]["mbox"],
+    "name": contacts[0]["name"],
+  }}) -%}
+{%- elif dc.qtn.created_by -%}
+  {%- do dmp.update({"contact": {
+    "contact_id": {
+      "identifier": dc.qtn.created_by.uuid,
+      "type": "other",
+    },
+    "mbox": dc.qtn.created_by.email,
+    "name": dc.qtn.created_by.first_name ~ " " ~ dc.qtn.created_by.last_name,
+  }}) -%}
+{%- endif -%}
+
+{# Cost #}
+{%- if costs|length > 0 -%}
+  {%- do dmp.update({"cost": costs}) -%}
+{%- endif -%}
+
+{# Ethical Issues #}
+{%- if ethicalIssuesDescriptions|length > 0 -%}
+  {%- do dmp.update({"ethical_issues_description": ethicalIssuesDescriptions|join(" ")}) -%}
+  {%- do dmp.update({"ethical_issues_exist": "yes" }) -%}
+{%- else -%}
+  {%- do dmp.update({"ethical_issues_exist": "no" }) -%}
+{%- endif -%}
+
+{%- if ethicalDocument|length > 0 and ethicalDocument[0].startswith("http") -%}
+  {%- do dmp.update({"ethical_issues_report": ethicalDocument[0]}) -%}
+{%- endif -%}
+
+{# Projects #}
+{%- if projects|length > 0 -%}
+  {%- do dmp.update({"project": projects}) -%}
+{%- endif -%}
+
+{#- top-level CCMM object (according to the schema) -#}
+{%- set CCMM = { "dmp": dmp } -%}

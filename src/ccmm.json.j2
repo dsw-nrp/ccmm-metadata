@@ -1,0 +1,3 @@
+{#- CCMM template based on https://github.com/techlib/CCMM -#}
+{%- import "src/mapping/ccmm.j2" as mapping with context -%}
+{{ mapping.ccmm|tojson(4) }}
