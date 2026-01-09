@@ -24,6 +24,7 @@
         "datasets": [],
         "outputsRetentionCriteriaDescription": None,
         "areOtherOutputs": None,
+        "swPackages": [],
         "otherOutputs": [],
         "sharedResources": {
             "collections": [],
@@ -1914,8 +1915,30 @@
 {%- do result.dmp.update({'areOtherOutputs': data.obj.areOtherOutputs|default(None)}) -%}
 {%- do result.dmp.update({'outputsRetentionCriteriaDescription': data.obj.outputsRetentionCriteriaDescription|default(None)}) -%}
 {%- if result.dmp.areOtherOutputs._value is sameas true -%}
-    {%- for otherOutputItem in data.obj.areOtherOutputs.otherOutputs -%}
-        {%- set otherOutput = {
+    {%- if result.dmp.areOtherOutputs.areSwPackages._value is sameas true -%}
+        {%- for swPackageItem in data.obj.areOtherOutputs.areSwPackages.swPackages -%}
+            {%- set swPackage = {
+                "name": swPackageItem.swPackage|default(None), 
+                "isOpenLicense": swPackageItem.isOpenLicense|default(None),
+                "whereAvailable": swPackageItem.whereAvailable|default(None),
+                "isListedInCatalogue": swPackageItem.isListedInCatalogue|default(None),
+            } -%}
+            {%- if swPackage.isOpenLicense -%}
+                {%- if swPackage.isOpenLicense._value == "yesDecided" -%}
+                    {%- if swPackageItem.isOpenLicense.openLicense -%}
+                        {%- do swPackage.update({
+                            "openSourceLicense": swPackageItem.isOpenLicense.openLicense|default(None),
+                        }) -%}
+                    {%- endif -%}
+                {%- endif -%}
+            {%- endif -%}
+            {%- do result.dmp.swPackages.append(swPackage) -%}
+        {%- endfor -%}
+    {%- endif -%}
+
+    {%- if result.dmp.areOtherOutputs.areOtherOutputsNoSw._value is sameas true -%}
+        {%- for otherOutputItem in data.obj.areOtherOutputs.areOtherOutputsNoSw.otherOutputs -%}
+            {%- set otherOutput = {
             "description": otherOutputItem.description|default(None), 
             "whyImportant": otherOutputItem.whyImportant|default(None),
             "whoWillUse": otherOutputItem.whoWillUse|default(None),
@@ -1933,5 +1956,6 @@
             }) -%}
         {%- endif -%}
         {%- do result.dmp.otherOutputs.append(otherOutput) -%}
-    {%- endfor -%}
+        {%- endfor -%}
+    {%- endif -%}
 {%- endif -%}
