@@ -195,7 +195,7 @@
         {%- do dataset.update({"language": {"label": datasetItem.language._value|default("")}}) -%}
       {%- endif -%}
       {%- if datasetItem.language._raw and datasetItem.language._raw.code|length == 3 -%}
-        {%- do dataset.language.update({"iri": "https://iso639-3.sil.org/code/" ~ datasetItem.language._raw.code|default("")}) -%}
+        {%- do dataset.language.update({"iri": "http://publications.europa.eu/resource/authority/language/" ~ datasetItem.language._raw.code|default("")|upper}) -%}
       {%- endif -%}
     {%- endif -%}
 
@@ -258,12 +258,24 @@
           }) -%}
           {%- do timeReferences.append(timeInterval) -%}
         {%- endif -%}
+        
+        {# Time Reference - Date Created #}
+        {%- if collection.dateCreated -%}
+          {%- set timeInstant = {
+            "timeInstant": collection.dateCreated._value|default(""),
+            "hasDateType": {
+              "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Created",
+              "label": "Date Created"
+            },
+          } -%}
+          {%- do timeReferences.append(timeInstant) -%}
+        {%- endif -%}
+
       {%- endif -%}
     {%- endif -%}
     
     {# Time refernce - Distribution Available #}
     {%- if datasetItem.distributions|length > 0 -%}
-      {%- set publicationYears = [] -%}
       {%- for distributionItem in datasetItem.distributions -%}
         {%- if distributionItem.whenAvailable -%}
           {%- set timeInterval = {
@@ -274,36 +286,43 @@
               "label": "Date Available of the Distribution " ~ distributionItem.name._value|default("")
             },
           } -%}
-          {%- if distributionItem.whenAvailable.endDate -%}
+          {%- if distributionItem.whenAvailable.endDate and distributionItem.whenAvailable.endDate._value -%}
             {%- do timeInterval.update({
               "endTime": distributionItem.whenAvailable.endDate._value|default(""),
             }) -%}
           {%- endif -%}
           {%- if distributionItem.whenAvailable.isAvailableImmediately._value is sameas false -%}
             {%- if distributionItem.whenAvailable.postponedAvailability -%}
-              {%- if distributionItem.whenAvailable.postponedAvailability.exactStartDate -%}
+              {%- if distributionItem.whenAvailable.postponedAvailability.exactStartDate and distributionItem.whenAvailable.postponedAvailability.exactStartDate._value -%}
                 {%- do timeInterval.update({
                   "startTime": distributionItem.whenAvailable.postponedAvailability.exactStartDate._value|default(""),
                 }) -%}
-                {# Publication Year #}
-                {%- set date = distributionItem.whenAvailable.postponedAvailability.exactStartDate._value|default("") -%}
-                {%- set year = date.split("-")[0] if "-" in date else "" -%}
-                {%- if year != "" -%}
-                  {%- do publicationYears.append(year) -%}
-                {%- endif -%}
               {%- endif -%}
             {%- endif -%}
           {%- endif -%}
           {%- do timeReferences.append(timeInterval) -%}
         {%- endif -%}
       {%- endfor -%}
-      {%- if publicationYears|length > 0 -%}
-        {%- set publicationYear = publicationYears | sort | first -%}
-        {%- do dataset.update({"publicationYear": publicationYear|default("")}) -%}
-      {%- endif -%}
     {%- endif -%}
 
-    {# TODO add date created - to Data Collection and Processing chapter #}
+    {# Time Reference - Issued Date and Publication Year #}
+    {%- if datasetItem.issueDate -%}
+      {%- set timeInstant = {
+        "timeInstant": datasetItem.issueDate._value|default(""),
+        "hasDateType": {
+          "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Issued",
+          "label": "Date Issued"
+        },
+      } -%}
+      {%- do timeReferences.append(timeInstant) -%}
+
+      {# Publication Year #}
+      {%- set date = datasetItem.issueDate._value|default("") -%}
+      {%- set year = date.split("-")[0] if "-" in date else "" -%}
+      {%- if year != "" -%}
+        {%- do dataset.update({"publicationYear": year|default("")}) -%}
+      {%- endif -%}
+    {%- endif -%}
 
     {%- if timeReferences|length > 0 -%}
       {%- do dataset.update({"timeReferences": timeReferences|default("")}) -%}
@@ -638,7 +657,7 @@
           "describes": metadataSpecification.usedBy|default([]),
         } -%}
         {%- if  metadataSpecification.language._raw and  metadataSpecification.language._raw.code|length == 3 -%}
-          {%- do metadata.update({"language": "https://iso639-3.sil.org/code/" ~  metadataSpecification.language._raw.code|default("")}) -%}
+          {%- do metadata.update({"language": "http://publications.europa.eu/resource/authority/language/" ~  metadataSpecification.language._raw.code|default("")|upper}) -%}
         {%- endif -%}
         {%- if metadataSpecification.isStandardMetadata._value is sameas true -%}
           {%- do metadata.conformsToMetadataStandard.update({
@@ -694,8 +713,10 @@
             {%- set nonEquipmentCollection = collection.nonEquipmentCollection -%}
               {%- if nonEquipmentCollection.initialCaptureMethod -%}
                 {%- if nonEquipmentCollection.initialCaptureMethod._value == "manual" -%}
-                  {%- if nonEquipmentCollection.dataNonDigitalEntryResponsibleParty|length > 0 -%}
-                    {%- do collectionPersons.extend(nonEquipmentCollection.dataNonDigitalEntryResponsibleParty) -%}
+                  {%- if nonEquipmentCollection.dataNonDigitalEntryResponsibleParty -%}
+                    {%- if nonEquipmentCollection.dataNonDigitalEntryResponsibleParty|length > 0  -%}
+                      {%- do collectionPersons.extend(nonEquipmentCollection.dataNonDigitalEntryResponsibleParty) -%}
+                    {%- endif -%}
                   {%- endif -%}
                 {%- endif -%}
               {%- endif -%}

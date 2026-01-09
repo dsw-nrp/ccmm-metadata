@@ -98,16 +98,18 @@
                 {%- do cost.allocation.append(costItem.allocationOther._value) -%}
             {%- endif -%}
             {# Cover of costs #}
-            {%- if costItem.coveredBy._value == "fundingGrant" -%}
-                {%- do cost.update({
-                    "isCoveredByGrant": {"_value": true},
-                    "coveredBy": costItem.coveredBy.grantId|default(None),
-                }) -%}
-            {%- elif costItem.coveredBy._value == "other" -%}
-                {%- do cost.update({
-                    "isCoveredByGrant": {"_value": false},
-                    "coveredBy": costItem.coveredBy.other|default(None),
-                }) -%}
+            {%- if costItem.coveredBy -%}
+                {%- if costItem.coveredBy._value == "fundingGrant" -%}
+                    {%- do cost.update({
+                        "isCoveredByGrant": {"_value": true},
+                        "coveredBy": costItem.coveredBy.grantId|default(None),
+                    }) -%}
+                {%- elif costItem.coveredBy._value == "other" -%}
+                    {%- do cost.update({
+                        "isCoveredByGrant": {"_value": false},
+                        "coveredBy": costItem.coveredBy.other|default(None),
+                    }) -%}
+                {%- endif -%}
             {%- endif -%}
             {%- do project.costs.append(cost) -%}
         {%- endfor -%}
@@ -350,6 +352,7 @@
         "isPlanned": collectionItem.isPlanned|default(None),
         "startDate": collectionItem.startDate|default(None),
         "endDate": collectionItem.endDate|default(None),
+        "dateCreated" : collectionItem.dateCreated|default(None),
         "isEquipmentCollection": collectionItem.isEquipmentCollection|default(None),
         "equipmentCollection": {},
         "isNonEquipmentCollection":collectionItem.isNonEquipmentCollection|default(None),
@@ -1091,7 +1094,7 @@
     {%- if distribution.whenAvailable.isAvailableImmediately._value is sameas true -%}
         {%- do distribution.whenAvailable.update({
             "postponedAvailability": None,
-            "endDate": distributionItem.whenAvailable.endDate|default(None),
+            "endDate": distributionItem.endDate|default(None),
         }) -%}
     {%- elif distribution.whenAvailable.isAvailableImmediately._value is sameas false -%}
         {%- do distribution.whenAvailable.update({
@@ -1864,11 +1867,20 @@
 
             {%- if toolItem.isForAllDatasets._value is sameas true -%}
                 {# Assign this tool to all datasets #}
-                {%- for dataset in result.dmp.datasets -%}
+                {%- for datasetUuid, dataset in datasetsMap.items() -%}
                     {# Append this tool if not already there #}
                     {%- if toolItem._uuid not in dataset.tools -%}
-                        {%- do dataset.tools.append(toolItem._uuid) -%}
-                        {%- do usedBy.append(dataset.uuid) -%}
+                        {%- do datasetsMap[datasetUuid].tools.append(tool.uuid) -%}
+                        {%- do tool.usedBy.append(datasetUuid) -%}
+                    {%- endif -%}
+                {%- endfor -%}
+                {%- for reusedDataset in result.dmp.reusingData.consideredDatasets -%}
+                    {%- if reusedDataset.isReused is defined and reusedDataset.isReused._value is sameas true -%}
+                        {# Append this tool if not already there #}
+                        {%- if toolItem._uuid not in reusedDataset.reusedData.tools -%}
+                            {%- do reusedDatasetsMap[reusedDataset.uuid].reusedData.tools.append(tool.uuid) -%}
+                            {%- do tool.usedBy.append(reusedDataset.uuid) -%}
+                        {%- endif -%}
                     {%- endif -%}
                 {%- endfor -%}
                 {%- do result.dmp.sharedResources.tools.append(tool) -%}
