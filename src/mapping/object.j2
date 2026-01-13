@@ -887,7 +887,6 @@
         "usedBy": [],
         "name": dataStorageItem.name|default(None),
         "description": dataStorageItem.description|default(None),
-        "url": dataStorageItem.url|default(None),
         "availability": dataStorageItem.availability|default(None),
         "geographicalLocation": dataStorageItem.geographicalLocation|default(None),
         "type": dataStorageItem.type|list,
@@ -1282,7 +1281,6 @@
     {%- if metadataSpecification.isStandardMetadata._value is sameas true -%}
         {%- do metadataSpecification.standardMetadata.update({
             "identifier": metadataItem.isStandardMetadata.identifier|default(None),
-            "type": metadataItem.isStandardMetadata.type|default(None),
         }) -%}
     {%- elif metadataSpecification.isStandardMetadata._value is sameas false -%}
         {%- do metadataSpecification.noStandardMetadata.update({

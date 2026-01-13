@@ -128,11 +128,7 @@
 
     {# Title #}
     {%- if datasetItem.name -%}
-      {%- if datasetItem.name._raw -%}
-        {%- do dataset.update({"title": datasetItem.name._raw.name|default("")}) -%}
-      {%- else -%}
-        {%- do dataset.update({"title": datasetItem.name._value|default("")}) -%}
-      {%- endif -%}
+      {%- do dataset.update({"title": datasetItem.name._value|default("")}) -%}
     {%- endif -%}
 
     {# Description #}
@@ -417,7 +413,7 @@
         {%- if format.name -%}
           {%- if format.name._raw -%}
             {%- do formats.append({
-              "iri": "https://www.iana.org/assignments/media-types/" ~ format.name._raw.name,
+              "iri": "https://fairsharing.org/" ~ format.name._raw.id,
               "label": format.name._raw.name
             }) -%}
           {%- elif format.name._value -%}
@@ -530,7 +526,11 @@
           "title": "",
         } -%}
         {%- if dataStore.name -%}
-          {%- do relatedResource.update({"title": dataStore.name._value|default("")}) -%}
+          {%- if dataStore.name._raw -%}
+            {%- do relatedResource.update({"title": dataStore.name._raw.name|default("")}) -%}
+          {%- else -%}
+            {%- do relatedResource.update({"title": dataStore.name._value|default("")}) -%}
+          {%- endif -%}
         {%- endif -%}
         {%- if dataStore.url -%}
           {%- do relatedResource.update({"url": dataStore.url._value|default("")}) -%}
@@ -660,9 +660,15 @@
           {%- do metadata.update({"language": "http://publications.europa.eu/resource/authority/language/" ~  metadataSpecification.language._raw.code|default("")|upper}) -%}
         {%- endif -%}
         {%- if metadataSpecification.isStandardMetadata._value is sameas true -%}
-          {%- do metadata.conformsToMetadataStandard.update({
-            "iri": metadataSpecification.standardMetadata.identifier._value|default(""),
-          }) -%}
+          {%- if metadataSpecification.standardMetadata.identifier._raw -%}
+            {%- do metadata.conformsToMetadataStandard.update({
+              "iri": "https://fairsharing.org/" ~ metadataSpecification.standardMetadata.identifier._raw.id,
+            }) -%}
+          {%- else -%}
+            {%- do metadata.conformsToMetadataStandard.update({
+              "label": metadataSpecification.standardMetadata.name._value|default(""),
+            }) -%}
+          {%- endif -%}
         {%- endif -%}
         {%- do metadataSpecificationList.append(metadata) -%}
       {%- endfor -%}
