@@ -155,14 +155,21 @@
         "roles": contributorItem.roles|map(attribute="_label")|list,
         "projectsName": [],
     } -%}
-    {%- for project in contributorItem.projects -%}
-        {%- if project.project and project.project._uuid in projectsMap -%}
-            {%- set project_name = projectsMap[project.project._uuid].name._value if projectsMap[project.project._uuid].name else None -%}
-            {%- if project_name is not none -%}
-                {%- do contributor.projectsName.append(project_name) -%}
+    {%- if contributorItem.projects|length > 0 -%}
+        {%- for project in contributorItem.projects -%}
+            {%- if project.project and project.project._uuid in projectsMap -%}
+                {%- set project_name = projectsMap[project.project._uuid].name._value if projectsMap[project.project._uuid].name else None -%}
+                {%- if project_name is not none -%}
+                    {%- do contributor.projectsName.append(project_name) -%}
+                {%- endif -%}
             {%- endif -%}
+        {%- endfor -%}
+    {%- elif result.dmp.projects|length == 1 -%}
+        {%- set project_name = result.dmp.projects[0].name._value if result.dmp.projects[0].name else None -%}
+        {%- if project_name is not none -%}
+            {%- do contributor.projectsName.append(project_name) -%}
         {%- endif -%}
-    {%- endfor -%}
+    {%- endif -%}
     {%- do contributorsMap.update({contributor.uuid: contributor}) -%}
     {%- do result.dmp.collaboration.contributors.append(contributor) -%}
 {%- endfor -%}
@@ -1269,7 +1276,7 @@
         "howAvailableGuaranteed": None,
         "isFindable": metadataItem.isFindable|default(None),
         "noFindableReason": None,
-        "howConnectionToData": metadataItem.howConnectionToData|default(None),
+        "howConnectionToData": metadataItem.howConnectionToData|map(attribute="_label")|list,
         "isProvenanceDocumented": metadataItem.isProvenanceDocumented|default(None),
         "provenanceDocumented": {},
         "noProvenanceReason": None,
@@ -1308,10 +1315,8 @@
             "noFindableReason": metadataItem.isFindable.noFindableReason|default(None),
         }) -%}
     {%- endif -%}
-    {%- if metadataSpecification.howConnectionToData._value == "other" -%}
-        {%- do metadataSpecification.update({
-            "howConnectionToData": metadataItem.howConnectionToData.other|default(None),
-        }) -%}
+    {%- if metadataItem.howConnectionToDataOther._value -%}
+        {%- do metadataSpecification.howConnectionToData.append( metadataItem.howConnectionToDataOther._value|default(None)) -%}
     {%- endif -%}
     {%- if metadataSpecification.isProvenanceDocumented._value is sameas true -%}
         {%- do metadataSpecification.provenanceDocumented.update({
@@ -1549,6 +1554,11 @@
                 "archivalExtensionDecisionMaker": preservationItem.usesLongTermStorageAfterProject.isArchivalPeriodExtendable.archivalExtensionDecisionMaker|default(None),
                 "archivalExtensionDecisionCriteria": preservationItem.usesLongTermStorageAfterProject.isArchivalPeriodExtendable.archivalExtensionDecisionCriteria|map(attribute="_value")|list,
             }) -%}
+            {%- if preservationStrategy.longTermStorageAfterProject.archivalPeriodExtension.archivalExtensionDecisionMaker._value == "other" -%}
+                {%- do preservationStrategy.longTermStorageAfterProject.archivalPeriodExtension.update({
+                    "archivalExtensionDecisionMaker": preservationItem.usesLongTermStorageAfterProject.isArchivalPeriodExtendable.archivalExtensionDecisionMaker.other|default(None),
+                }) -%}
+            {%- endif -%}
         {%- elif preservationStrategy.longTermStorageAfterProject.isArchivalPeriodExtendable._value is sameas false -%}
             {%- do preservationStrategy.longTermStorageAfterProject.update({
                 "noArchivalPeriodExtensionReason": preservationItem.usesLongTermStorageAfterProject.isArchivalPeriodExtendable.noArchivalPeriodExtensionReason|default(None),
