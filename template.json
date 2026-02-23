@@ -5,7 +5,7 @@
     "name": "Czech Core Metadata Model (CCMM)",
     "description": "Czech Core Metadata Model for Czech National Repository Platform",
     "license": "Apache-2.0",
-    "metamodelVersion": "17.0",
+    "metamodelVersion": "17.1",
     "allowedPackages": [
         {
             "orgId": "dmp.eosc.cz",

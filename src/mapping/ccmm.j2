@@ -567,7 +567,9 @@
           {%- do relatedResource.update({"title": tool.name._value|default("")}) -%}
         {%- endif -%}
         {%- if tool.hasAccessLink._value is sameas true -%}
-          {%- do relatedResource.update({"url": tool.accessLink._value|default("")}) -%}
+          {%- if tool.identifier.type._raw and tool.identifier.type._raw.id == 709 -%}
+            {%- do relatedResource.update({"url": tool.identifier.value._value|default("")}) -%}
+          {%- endif -%}
         {%- endif -%}
         {%- do relatedResource.type.update({
           "iri": "https://vocabularies.coar-repositories.org/resource_types/c_5ce6/",
