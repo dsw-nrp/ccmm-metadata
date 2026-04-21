@@ -37,8 +37,8 @@
           "uuid": contributorItem.uuid|default(""),
           "iri": "https://orcid.org/" ~ contributorItem.orcid._raw["orcid-id"]|default(""),
           "value": contributorItem.orcid._raw["orcid-id"]|default(""),
-          "scheme": {
-            "iri": "https://doi.org/10.25504/FAIRsharing.nx58jg",
+          "inScheme": {
+            "iri": "https://orcid.org/",
             "label": "ORCID",
           },
         }) -%}
@@ -47,8 +47,8 @@
           "uuid": contributorItem.uuid|default(""),
           "iri": "https://orcid.org/" ~ contributorItem.orcid._value|default(""),
           "value": contributorItem.orcid._value|default(""),
-          "scheme": {
-            "iri": "https://doi.org/10.25504/FAIRsharing.nx58jg",
+          "inScheme": {
+            "iri": "https://orcid.org/",
             "label": "ORCID",
           },
         }) -%}
@@ -66,8 +66,8 @@
           "identifier": {
             "iri": contributorItem.affiliation._raw.id|default(""),
             "value": contributorItem.affiliation._raw.id|default("")| replace("https://ror.org/", ""),
-            "scheme": {
-              "iri": "https://doi.org/10.25504/FAIRsharing.1jKfji",
+            "inScheme": {
+              "iri": "https://ror.org/",
               "label": "ROR",
             },
           },
@@ -88,21 +88,40 @@
   {%- for fundingItem in projectItem.fundings -%}
     {%- if fundingItem.funder -%}
       {%- set organisation = {} -%}
+      {% set org = namespace(nameDisplay="") %}
       {%- if fundingItem.funder._raw -%}
+        {%- for name in fundingItem.funder._raw.names -%}
+          {% if "ror_display" in name.types -%}
+            {% set org.nameDisplay = name.value %}
+          {%- endif %}
+        {%- endfor %}
         {%- do organisation.update({
-          "iri": fundingItem.funder._raw.uri|default(""),
+          "iri": fundingItem.funder._raw.id|default(""),
           "funderId" : {
-            "value": fundingItem.funder._raw.id|default(""),
-            "schema": {
-              "iri": "https://doi.org/10.13039/",
-              "label": "Crossref Funder ID"
+            "iri": fundingItem.funder._raw.id|default(""),
+            "value": fundingItem.funder._raw.id|default("")|replace("https://ror.org/",""),
+            "inScheme": {
+              "iri": "https://ror.org/",
+              "label": "ROR"
             }
           },
-          "name": fundingItem.funder._raw.name|default(""),
+          "name": org.nameDisplay|default(""),
         }) -%}
       {%- else -%}
         {%- do organisation.update({
           "name": fundingItem.funder._value|default(""),
+        }) -%}
+        {%- do organisation.update({
+          "iri": fundingItem.funder.uuid|default(""),
+          "funderId" : {
+            "value": fundingItem.funder.uuid|default(""),
+            "iri": "urn:uuid:"~fundingItem.funder.uuid|default(""),
+            "inScheme": {
+              "iri": "urn:uuid:",
+              "label": "Universally Unique Identifier"
+            }
+          },
+          "name": fundingItem.funder.name|default(""),
         }) -%}
       {%- endif -%}
       {%- do organisations.append(organisation) -%}
@@ -145,43 +164,53 @@
 
     {# Identifiers #}
     {%- set identifiers = [] -%}
-    {# map FAIRsharing type IDs -> label #}
-    {%- set idTypeMap = {
-      "317": "ARK",
-      "1538": "Handle",
-      "1332": "DOI",
-      "709": "URL"
-    } -%}
-
-    {%- for identifierItem in datasetItem.identifiers -%}
-      {%- set t = identifierItem.type._raw if identifierItem.type and identifierItem.type._raw else none -%}
-
-      {%- set idType = idTypeMap.get(t.id, "other") if t else "other" -%}
-      {%- set schemeIri = ("https://doi.org/" ~ t.doi|default("")) if t else "" -%}
-
+    {%- for identifierItem in datasetItem.identifiers | default([])-%}
+      {%- set iri = "" -%}
+      {%- set schemeIri = "" -%}
+      {%- set label = "" -%} 
+      {%- set value = "" -%}
+      {%- if identifierItem.type is defined and identifierItem.type._raw is defined and identifierItem.value is defined -%}
+        {%- set label = identifierItem.type._raw.name|default("") -%}
+        {%- set value = identifierItem.value._value|default("") -%}
+        {%- if identifierItem.type._raw.urlPattern is defined and identifierItem.type._raw.urlPattern -%}
+          {%- set iri = identifierItem.type._raw.urlPattern|replace("{$id}",identifierItem.value._value|default("")) -%}
+          {%- set schemeIri = identifierItem.type._raw.urlPattern|replace("{$id}","") -%}
+        {%- else -%}
+          {%- set schemeIri = "https://doi.org/" ~ identifierItem.type._raw.doi -%}
+          {%- set iri = identifierItem.type._value|default("") -%}
+        {%- endif -%}
+      {%- elif identifierItem.type is defined and identifierItem.value is defined -%}
+        {%- set iri = identifierItem.value._value|default("") -%}
+        {%- set schemaIri = identifierItem.type._value|default("") -%}
+        {%- set label = identifierItem.type._value|default("") -%}
+        {%- set value = identifierItem.value._value|default("") -%}
+      {%- endif -%}
       {%- set identifier = {
-        "value": identifierItem.value._value|default(""),
+        "iri": iri|default(""),
+        "value": value|default(""),
         "inScheme": {
-          "iri": schemeIri,
-          "label": idType
+          "iri": schemaIri|default(""),
+          "label": label|default("")
         }
       } -%}
       {%- do identifiers.append(identifier) -%}
     {%- endfor -%}
 
     {%- if identifiers|length > 0 -%}
-      {%- do dataset.update({"identifiers": identifiers|default("")}) -%}
+      {%- do dataset.update({"identifiers": identifiers| default([])}) -%}
     {%- else -%}
       {%- set identifier = {
+        "iri": "urn:uuid:"~datasetItem.uuid|default(""),
         "value": datasetItem.uuid|default(""),
         "inScheme": {
-          "iri": "",
-          "label": "UUID"
+          "iri": "urn:uuid:",
+          "label": "Universally Unique Identifier"
         }
       } -%}
       {%- do identifiers.append(identifier) -%}
-      {%- do dataset.update({"identifiers": identifiers|default("")}) -%}
+      {%- do dataset.update({"identifiers": identifiers|default([])}) -%}
     {%- endif -%}
+    {%- do dataset.update({"iri": identifiers[0].iri}) -%}
 
     {# Language #}
     {%- if datasetItem.language -%}
@@ -211,6 +240,17 @@
         {%- set subject = {
           "title": keyword._value|default(""),
         } -%}
+        {%- if keyword._raw -%}
+          {%- do subject.update({
+            "iri": keyword._raw.id|default(""),
+            "inScheme": {
+              "iri": "https://vocabs.ccmm.cz/registry/codelist/SubjectCategory/",
+              "label": "OECD FORD Subject Category (Frascati)"
+            }
+          }) -%}
+        {%- else -%}
+          {%- do subject.update({"iri": keyword.uuid|default("")}) -%}
+        {%- endif -%}
         {%- do subjects.append(subject) -%}
       {%- endfor -%}
       {%- if subjects|length > 0 -%}
@@ -234,39 +274,44 @@
         {%- endif -%}
       {%- endfor -%}
       {%- set collection = collectionList[0] -%}
+      {%- set timeReference = {
+        "time":{},
+        "dateType":{}
+      } -%}
+
       {%- if collection -%}
-        {%- set timeInterval= {
-          "startTime": "",
-          "endTime": "",
-          "hasDateType": {
-            "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Collected",
-            "label": "Date Collected"
-          },
-        } -%}
-        {%- if collection.startDate -%}
-          {%- do timeInterval.update({
+        {# Time Interval #}
+        {%- if collection.startDate._value is defined and collection.endDate._value is defined -%}
+          {%- do timeReference.time.update({
             "startTime": collection.startDate._value|default(""),
-          }) -%}
-        {%- endif -%}
-        {%- if collection.endDate -%}
-          {%- do timeInterval.update({
             "endTime": collection.endDate._value|default(""),
           }) -%}
-          {%- do timeReferences.append(timeInterval) -%}
-        {%- endif -%}
-        
+          {%- do timeReference.dateType.update({
+            "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Collected",
+            "label": "Date Collected"
+          }) -%}
+          {%- do timeReferences.append(timeReference) -%}
         {# Time Reference - Date Created #}
-        {%- if collection.dateCreated -%}
-          {%- set timeInstant = {
-            "timeInstant": collection.dateCreated._value|default(""),
-            "hasDateType": {
-              "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Created",
-              "label": "Date Created"
-            },
-          } -%}
-          {%- do timeReferences.append(timeInstant) -%}
+        {%- elif collection.startDate._value is defined -%}
+          {%- do timeReference.time.update({
+            "timeInstant": collection.startDate._value|default(""),
+          }) -%}
+          {%- do timeReference.dateType.update({
+            "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Created",
+            "label": "Date Created"
+          }) -%}
+          {%- do timeReferences.append(timeReference) -%}
+        {# Time Reference - Date Creation Ended #}
+        {%- elif collection.endDate._value is defined -%}
+          {%- do timeReference.time.update({
+            "timeInstant": collection.endDate._value|default(""),
+          }) -%}
+          {%- do timeReference.dateType.update({
+            "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Created",
+            "label": "Date Created"
+          }) -%}
+          {%- do timeReferences.append(timeReference) -%}
         {%- endif -%}
-
       {%- endif -%}
     {%- endif -%}
     
@@ -274,43 +319,59 @@
     {%- if datasetItem.distributions|length > 0 -%}
       {%- for distributionItem in datasetItem.distributions -%}
         {%- if distributionItem.whenAvailable -%}
-          {%- set timeInterval = {
-            "startTime": "",
-            "endTime": "",
-            "hasDateType": {
-              "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Available",
-              "label": "Date Available of the Distribution " ~ distributionItem.name._value|default("")
-            },
+          {%- set timeReference = {
+            "time":{},
+            "dateType":{}
           } -%}
-          {%- if distributionItem.whenAvailable.endDate and distributionItem.whenAvailable.endDate._value -%}
-            {%- do timeInterval.update({
-              "endTime": distributionItem.whenAvailable.endDate._value|default(""),
-            }) -%}
+          {%- if distributionItem.name._value is defined -%}
+            {%- set label = "Availability of the distribution " ~ distributionItem.name._value -%}
+          {%- else -%}
+            {%- set label = "Availability of distribution" -%}
           {%- endif -%}
-          {%- if distributionItem.whenAvailable.isAvailableImmediately._value is sameas false -%}
+          {%- if distributionItem.whenAvailable.isAvailableImmediately._value is sameas false and distributionItem.whenAvailable.endDate._value is defined -%}
             {%- if distributionItem.whenAvailable.postponedAvailability -%}
               {%- if distributionItem.whenAvailable.postponedAvailability.exactStartDate and distributionItem.whenAvailable.postponedAvailability.exactStartDate._value -%}
-                {%- do timeInterval.update({
+                {%- do timeReference.time.update({
                   "startTime": distributionItem.whenAvailable.postponedAvailability.exactStartDate._value|default(""),
+                  "endTime": distributionItem.whenAvailable.endDate._value|default("")
                 }) -%}
+                {%- do timeReference.dateType.update({
+                  "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Available",
+                  "label": label
+                }) -%}
+                {%- do timeReferences.append(timeReference) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- elif distributionItem.whenAvailable.isAvailableImmediately._value is sameas false -%}
+            {%- if distributionItem.whenAvailable.postponedAvailability -%}
+              {%- if distributionItem.whenAvailable.postponedAvailability.exactStartDate and distributionItem.whenAvailable.postponedAvailability.exactStartDate._value -%}
+                {%- do timeReference.time.update({
+                  "timeInstant": distributionItem.whenAvailable.postponedAvailability.exactStartDate._value|default(""),
+                }) -%}
+                {%- do timeReference.dateType.update({
+                  "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Available",
+                  "label": label
+                }) -%}
+                {%- do timeReferences.append(timeReference) -%}
               {%- endif -%}
             {%- endif -%}
           {%- endif -%}
-          {%- do timeReferences.append(timeInterval) -%}
         {%- endif -%}
       {%- endfor -%}
     {%- endif -%}
 
     {# Time Reference - Issued Date and Publication Year #}
     {%- if datasetItem.issueDate -%}
-      {%- set timeInstant = {
-        "timeInstant": datasetItem.issueDate._value|default(""),
-        "hasDateType": {
+      {%- set timeReference = {
+        "time":{
+          "timeInstant": datasetItem.issueDate._value|default(""),
+        },
+        "dateType":{
           "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Issued",
           "label": "Date Issued"
-        },
+        }
       } -%}
-      {%- do timeReferences.append(timeInstant) -%}
+      {%- do timeReferences.append(timeReference) -%}
 
       {# Publication Year #}
       {%- set date = datasetItem.issueDate._value|default("") -%}
@@ -376,7 +437,7 @@
     {%- set distributions = [] -%}
     {%- for distributionItem in datasetItem.distributions -%}
       {%- set distribution = {
-        "uuid": distributionItem.uuid|default(""),
+        "iri": distributionItem.uuid|default(""),
         "title": "",
         "downloadUrl": "",
         "accessUrl": "",
@@ -437,6 +498,7 @@
     {%- for projectItem in data.dmp.projects -%}
       {%- for fundingItem in projectItem.fundings -%}
         {%- set funding = {
+          "iri": fundingItem.uuid|default(""),
           "funder": "",
           "localIdentifier": "",
         } -%}
@@ -445,9 +507,9 @@
         {%- endif -%}
         {%- if fundingItem.funder -%}
           {%- if fundingItem.funder._raw -%}
-            {%- do funding.update({"funder": fundingItem.funder._raw.name|default("")}) -%}
+            {%- do funding.update({"funder": fundingItem.funder._raw.id|default("")}) -%}
           {%- else -%}
-            {%- do funding.update({"funder": fundingItem.funder._value|default("")}) -%}
+            {%- do funding.update({"funder": fundingItem.funder.uuid|default("")}) -%}
           {%- endif -%}
         {%- endif -%}
         {%- do fundings.append(funding) -%}
@@ -643,44 +705,25 @@
     {%- endif -%}
 
     {# Metadata #}
-    {%- if data.dmp.sharedResources.metadataSpecifications|length > 0 -%}
-      {%- set metadataSpecifications = [] -%}
-      {%- for metadataSpecification in data.dmp.sharedResources.metadataSpecifications -%}
-        {%- if metadataSpecification.usedBy and (datasetItem.uuid in metadataSpecification.usedBy) -%}
-          {%- do metadataSpecifications.append(metadataSpecification) -%}
-        {%- endif -%}
-      {%- endfor -%}
+      {%- set metadata = {
+        "conformsToMetadataStandard": {},
+        "qualifiedRelations": []
+      } -%}
+      {%- do metadata.conformsToMetadataStandard.update({ 
+        "iri": "https://model.ccmm.cz/research-data/1.1.0",
+        "label": "Czech Core Metadata Model for Research Data"
+      }) -%}
 
-      {%- set metadataSpecificationList = [] -%}
-      {%- for metadataSpecification in metadataSpecifications -%}
-        {%- set metadata = {
-          "uuid": metadataSpecification.uuid|default(""),
-          "conformsToMetadataStandard": {},
-          "describes": metadataSpecification.usedBy|default([]),
-        } -%}
-        {%- if  metadataSpecification.language._raw and  metadataSpecification.language._raw.code|length == 3 -%}
-          {%- do metadata.update({"language": "http://publications.europa.eu/resource/authority/language/" ~  metadataSpecification.language._raw.code|default("")|upper}) -%}
-        {%- endif -%}
-        {%- if metadataSpecification.isStandardMetadata._value is sameas true -%}
-          {%- if metadataSpecification.standardMetadata.identifier._raw -%}
-            {%- do metadata.conformsToMetadataStandard.update({
-              "iri": "https://fairsharing.org/" ~ metadataSpecification.standardMetadata.identifier._raw.id,
-            }) -%}
-          {%- else -%}
-            {%- do metadata.conformsToMetadataStandard.update({
-              "label": metadataSpecification.standardMetadata.name._value|default(""),
-            }) -%}
-          {%- endif -%}
-        {%- endif -%}
-        {%- do metadataSpecificationList.append(metadata) -%}
-      {%- endfor -%}
-      {%- if metadataSpecificationList|length > 0 -%}
-        {%- do dataset.update({"isDescribedBy": metadataSpecificationList|default([])}) -%}
-      {%- endif -%}
-    {%- endif -%}
+      {%- do dataset.update({"isDescribedBy": metadata}) -%}
 
     {# Qualified Relations #}
     {%- set qualifiedRelations = [] -%}
+    {# Mandatory roles by CCMM #}
+    {%- set ns = namespace(
+      hasDataManager=false,
+      hasPublisher=false,
+      hasCreator=false
+    ) -%}
 
     {# Contact person - we have for distribution, here is used for dataset #}
     {%- if datasetItem.distributions|length > 0 -%}
@@ -703,6 +746,37 @@
         {%- do qualifiedRelations.append(qualifiedRelation) -%}
         {%- endfor -%}
       {%- endif -%}
+    {%- endif -%}
+  
+    {# Publisher #}
+    {%- if datasetItem.hasPublisher -%}
+      {%- set ns.hasPublisher = true -%}
+      {%- set qualifiedRelation = {
+        "role": {
+          "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Publisher",
+          "label": "Publisher",
+        }
+      } -%}
+      {%- if datasetItem.hasPublisher._raw -%}
+        {% set org = namespace(nameDisplay="") %}
+        {%- for name in datasetItem.hasPublisher._raw.names -%}
+            {% if "ror_display" in name.types -%}
+                {% set org.nameDisplay = name.value %}
+            {%- endif %}
+        {%- endfor %}
+        {%- set organization = {
+          "name": org.nameDisplay|default(""),
+          "iri": datasetItem.hasPublisher._raw.id|default("")
+        } -%}
+        {%- do qualifiedRelation.update({"organization": organization}) -%}
+      {%- else -%}
+        {%- set organization = {
+          "name": datasetItem.hasPublisher._value|default(""),
+          "iri": datasetItem.hasPublisher.uuid|default("")
+        } -%}
+        {%- do qualifiedRelation.update({"organization": organization}) -%}
+      {%- endif -%}
+      {%- do qualifiedRelations.append(qualifiedRelation) -%}
     {%- endif -%}
 
     {# Data Collector - in case of nonEquipmentCollection who is repsponsible for digitalisation #}
@@ -769,24 +843,69 @@
     {# Qualified Relations - all contributors #}
     {%- if data.dmp.collaboration.contributors|length > 0 -%}
       {%- for contributor in data.dmp.collaboration.contributors -%}
-        {%- for role in contributor.roles -%}
+        {%- for defRole in contributor.roles -%}
           {%- set role = {
-            "iri": roleVocabulary.get(role, "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Other"),
-            "label": role,
+            "iri": roleVocabulary.get(defRole, "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Other"),
+            "label": defRole,
           }-%}
           {%- set qualifiedRelation = {
             "role": role,
             "person": contributor.uuid|default(""),
           } -%}
-          {%- do qualifiedRelations.append(qualifiedRelation) -%}
+
+          {%- if defRole == "Data Manager" -%}
+            {%- set ns.hasDataManager = true -%}
+            {%- do dataset.isDescribedBy.qualifiedRelations.append(qualifiedRelation) -%}
+          {%- else -%}
+            {%- do qualifiedRelations.append(qualifiedRelation) -%}
+          {%- endif -%}
         {%- endfor -%}
+
+        {%- if contributor.isCreator and contributor.isCreator._value is sameas true -%}
+          {%- set ns.hasCreator = true -%}
+          {%- set qualifiedRelation = {
+            "role": {
+              "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Creator",
+              "label": "Creator",
+            },
+            "person": contributor.uuid|default(""),
+          } -%}
+          {%- do qualifiedRelations.append(qualifiedRelation) -%}
+        {%- endif -%}
       {%- endfor -%}
+    {%- endif -%}
+
+    {%- if ns.hasPublisher == false -%}
+      {%- set qualifiedRelation = {
+        "role": {
+          "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Publisher",
+          "label": "Publisher",
+        }
+      } -%}
+      {%- do qualifiedRelations.append(qualifiedRelation) -%}
+    {%- endif -%}
+    {%- if ns.hasCreator == false -%}
+      {%- set qualifiedRelation = {
+        "role": {
+          "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Creator",
+          "label": "Creator",
+        }
+      } -%}
+      {%- do qualifiedRelations.append(qualifiedRelation) -%}
+    {%- endif -%}
+    {%- if ns.hasDataManager == false -%}
+      {%- set qualifiedRelation = {
+        "role": {
+          "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/DataManager",
+          "label": "DataManager",
+        }
+      } -%}
+      {%- do qualifiedRelations.append(qualifiedRelation) -%}
     {%- endif -%}
 
     {%- if qualifiedRelations|length > 0 -%}
       {%- do dataset.update({"qualifiedRelations": qualifiedRelations|default("")}) -%}
     {%- endif -%}
-
     {%- do datasets.append(dataset) -%}
   {%- endfor -%}
 {%- endif -%}

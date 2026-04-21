@@ -1,49 +1,15 @@
-{# Formatting macros #}
-{%- macro formatEmail(email) -%}
-  <span class="email"><a href="mailto:{{ email }}">{{ email._value }}</a></span>
-{%- endmacro -%}
-
-{%- macro formatOrcid(reply) -%}
-  {%- if reply._id -%}
-    <span class="orcid">ORCID: <a href="https://orcid.org/{{ reply._id }}" target="_blank">{{ reply._id }}</a></span>
-  {%- else -%}
-    <span class="orcid">ORCID: {{ reply._value }} </span>
-  {%- endif -%}
-{%- endmacro -%}
-
-{%- macro integrationValue(reply) -%}
-    {%- if reply._id -%}
-        <a href="{{ reply._url}}" target="_blank">{{ reply._value if reply._value else "no name given"}}</a>
-    {%- elif reply._value -%}
-        {{ reply._value }}
-    {%- endif -%}
-{%- endmacro -%}
-
-{%- macro integrationFairsharing(reply) -%}
-  {%- set line = reply.split('\n', 1)[0].rsplit(' ![]', 1)[0] -%}
-  {%- if '[' in line and ']' in line -%}
-    {%- set name_part = line.split('[', 1)[1].split(']', 1)[0] -%}
-    {{ name_part.replace('**', '') | trim }}
-  {%- else -%}
-    {{ line.replace('**', '') | trim }}
-  {%- endif -%}
-{%- endmacro -%}
-
-{%- macro downloadUrlFile(document) -%}
-  {%- if document -%}
-          <a href="{{ document._url }}" target="_blank">{{document._name}}</a>
-  {%- else -%}
-          <span class="error">File not found</span>
-  {%- endif -%}
-{%- endmacro -%}
-
-{%- macro formatDetection() -%}
-  {# HTML with warnings #}
-  {%- if dc.document.format_uuid == "990bad19-516f-4241-b5f2-06aa560a244c" -%}
-    HTML_with_warnings
-  {%- endif -%}
-{%- endmacro -%}
-
-{% macro lowerFirstLetter(string) -%}
-  {{ string[:1].lower() ~ string[1:] }}
+{% macro identifier(id) -%}
+{
+    "@type": [
+        "adms:Identifier",
+        "ccmm:Identifier"
+    ],
+    "@id": {{ id.iri| tojson }},
+    "ccmm:Identifier.value": {{ id.value | tojson }},
+    "ccmm:Identifier.inScheme": {
+        "@type": "ccmm:IdentifierScheme",
+        "@id": {{ id.inScheme.iri | tojson }},
+        "ccmm:IdentifierScheme.label": {{ id.inScheme.label | tojson }}
+    }
+}
 {%- endmacro %}

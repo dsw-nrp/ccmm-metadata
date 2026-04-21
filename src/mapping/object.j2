@@ -152,6 +152,7 @@
         "affiliation": contributorItem.affiliation|default(None),
         "email": contributorItem.email|default(None),
         "phone": contributorItem.phone|default(None),
+        "isCreator": contributorItem.isCreator|default(None),
         "roles": contributorItem.roles|map(attribute="_label")|list,
         "projectsName": [],
     } -%}
@@ -338,6 +339,7 @@
         {%- do dataset.update({
             "isPublished": datasetItem.willBePublished.isPublished|default(None),
         }) -%}
+        {%- do dataset.update({"hasPublisher": datasetItem.willBePublished.publisher}) -%}
     {%- endif -%}
     {%- for purpose in datasetItem.purposes -%}
         {%- if purpose.purpose and purpose.purpose._uuid in objectivesMap -%}
