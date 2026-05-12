@@ -107,6 +107,9 @@
                     {%- if subject.iri %}
                     "@id": {{ subject.iri | tojson }},
                     {%- endif %}
+                    {%- if subject.classificationCode %}
+                    "ccmm:Subject.classificationCode": {{ subject.classificationCode | tojson }},
+                    {%- endif -%}
                     {%- if subject.inScheme %}
                     "ccmm:Subject.inSubjectScheme": {
                         "@type": "ccmm:SubjectScheme",

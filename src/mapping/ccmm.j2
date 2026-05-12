@@ -244,7 +244,8 @@
           {%- set ns.atLeastOneFrascati = true -%}
           {%- do subject.update({
             "title": keyword._raw.label_en|default(""),
-            "iri": keyword._raw.id|default(""),
+            "iri": "https://vocabs.ccmm.cz/registry/codelist/SubjectCategory/" ~ keyword._raw.slug|default(""),
+            "classificationCode": keyword._raw.id|default(""),
             "inScheme": {
               "iri": "https://vocabs.ccmm.cz/registry/codelist/SubjectCategory/",
               "label": "OECD FORD Subject Category (Frascati)"
