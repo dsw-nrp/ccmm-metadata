@@ -108,12 +108,12 @@
                     "@id": {{ subject.iri | tojson }},
                     {%- endif %}
                     {%- if subject.inScheme %}
-                        "ccmm:Subject.inSubjectScheme": {
-                            "@type": "ccmm:SubjectScheme",
-                            "@id": {{ subject.inScheme.iri | tojson }},
-                            "ccmm:SubjectScheme.label": {{ subject.inScheme.label | tojson }}
-                        },
-                    {%- endif -%}
+                    "ccmm:Subject.inSubjectScheme": {
+                        "@type": "ccmm:SubjectScheme",
+                        "@id": {{ subject.inScheme.iri | tojson }},
+                        "ccmm:SubjectScheme.label": {{ subject.inScheme.label | tojson }}
+                    },
+                    {%- endif %}
                     "ccmm:Subject.title": {{ subject.title | tojson }}
                 }{{ "," if not loop.last }}
                 {%- endfor %}

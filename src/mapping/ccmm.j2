@@ -224,24 +224,26 @@
       {%- endif -%}
     {%- endif -%}
 
-    {# TODO change to option quesiton in NRP KM to COAR vocabullary #}
     {# Resource Type #}
     {%- if datasetItem.type -%}
-      {%- do dataset.update({"resourceType": {
-        "label": datasetItem.type._value|default("")
-      }}) -%}
+      {%- if datasetItem.type._raw -%}
+        {%- do dataset.update({"resourceType": {
+          "iri": "http://purl.org/coar/resource_type/" ~ datasetItem.type._raw.id|default(""),
+          "label": datasetItem.type._raw.label|default("")
+        }}) -%}
+      {%- endif -%}
     {%- endif -%}
 
     {# Subject #}
-    {# TODO add integration #}
-    {%- if datasetItem.keywords is defined and datasetItem.keywords|length > 0  -%}
+    {%- if datasetItem.keywords is defined -%}
       {%- set subjects = [] -%}
+      {%- set ns = namespace(atLeastOneFrascati=false) -%}
       {%- for keyword in datasetItem.keywords -%}
-        {%- set subject = {
-          "title": keyword._value|default(""),
-        } -%}
+        {%- set subject = {} -%}
         {%- if keyword._raw -%}
+          {%- set ns.atLeastOneFrascati = true -%}
           {%- do subject.update({
+            "title": keyword._raw.label_en|default(""),
             "iri": keyword._raw.id|default(""),
             "inScheme": {
               "iri": "https://vocabs.ccmm.cz/registry/codelist/SubjectCategory/",
@@ -249,10 +251,24 @@
             }
           }) -%}
         {%- else -%}
-          {%- do subject.update({"iri": keyword.uuid|default("")}) -%}
+          {%- do subject.update({
+            "title": keyword._value|default(""),
+            "iri": keyword.uuid|default(""),
+          }) -%}
         {%- endif -%}
         {%- do subjects.append(subject) -%}
       {%- endfor -%}
+      {%- if ns.atLeastOneFrascati == false -%}
+        {%- set subject = {
+          "title": "",
+          "iri": "",
+          "inScheme": {
+            "iri": "https://vocabs.ccmm.cz/registry/codelist/SubjectCategory/",
+            "label": "OECD FORD Subject Category (Frascati)"
+          }
+        } -%}
+        {%- do subjects.append(subject) -%}
+      {%- endif -%}
       {%- if subjects|length > 0 -%}
         {%- do dataset.update({"subjects": subjects|default("")}) -%}
       {%- else -%}
