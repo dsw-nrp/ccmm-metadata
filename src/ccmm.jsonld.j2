@@ -18,7 +18,7 @@
         "prov": "http://www.w3.org/ns/prov#",
         "time": "http://www.w3.org/2006/time#",
         "datacite": "https://model.ccmm.cz/vocabulary/datacite#",
-        "ccmmv": "https://model.ccmm.cz/vocabulary/ccmm#"
+        "ccmmv": "https://model.ccmm.cz/vocabulary/ccmm#",
         "ccmm": "https://model.ccmm.cz/research-data/"
     }
 {%- if dmp.datasets|length > 0 -%}
@@ -50,13 +50,13 @@
                 {%- if dataset.description.descriptionType -%}
                     ,
                     "ccmm:Description.hasDescriptionType": { 
-                            "@type": [
-                                "datacite:DescriptionType",
-                                "ccmm:DescriptionType"
-                            ],
-                            "@id": {{ dataset.description.descriptionType.iri | tojson }},
-                            "ccmm:DescriptionType.label": {{ dataset.description.descriptionType.label | tojson }}
-                        }
+                        "@type": [
+                            "datacite:DescriptionType",
+                            "ccmm:DescriptionType"
+                        ],
+                        "@id": {{ dataset.description.descriptionType.iri | tojson }},
+                        "ccmm:DescriptionType.label": {{ dataset.description.descriptionType.label | tojson }}
+                    }
                 {%- endif %}
                 }
             ]
@@ -203,11 +203,10 @@
                         "@id": {{ distribution.downloadUrl | tojson }}
                     }
                     {%- endif -%}
-                    {%- if distribution.byteSize -%}
+                    {%- if distribution.byteSize is defined -%}
                     ,
                     "ccmm:Distribution-DownloadableFile.byteSize": {{ distribution.byteSize | tojson }}
                     {%- endif -%}
-                    {%- if distribution.format -%}
                     ,
                     "ccmm:Distribution-DownloadableFile.hasFormat":
                         {
@@ -221,7 +220,6 @@
                             "@id": {{ distribution.format.iri | tojson }}
                             {%- endif %}
                         }
-                    {%- endif %}
                 }{{ "," if not loop.last }}
                 {%- endfor %}
             ]
@@ -231,7 +229,6 @@
             "ccmm:Dataset.hasFundingReference": [
                 {%- for fundingResource in dataset.fundingResources %}
                 {
-                    "@id": {{ fundingResource.iri | tojson }},
                     "@type": [
                         "datacite:FundingReference",
                         "ccmm:FundingReference"
@@ -319,10 +316,10 @@
                     "datacite:Rights",
                     "ccmm:TermsOfUse"
                 ]
-                {%- if dataset.termsOfUse.license -%}
+                {%- if dataset.termsOfUse.license is defined -%}
                 ,
                 "dcterms:license": {
-                    {%- if dataset.termsOfUse.license.iri %}
+                    {%- if dataset.termsOfUse.license.iri is defined %}
                     "@id": {{ dataset.termsOfUse.license.iri | tojson }}
                     {%- endif %}
                     {%- if dataset.termsOfUse.license.label -%}
@@ -333,14 +330,14 @@
                     "@type": "ccmm:LicenseDocument"
                 }
                 {%- endif -%}
-                {%- if dataset.termsOfUse.accessRights -%}
+                {%- if dataset.termsOfUse.accessRights is defined -%}
                 ,
                 "ccmm:TermsOfUse.accessRights": {
                     "@type": [
                         "datacite:Rights",
                         "ccmm:TermsOfUse"
                     ]
-                    {%- if dataset.termsOfUse.accessRights.iri -%}
+                    {%- if dataset.termsOfUse.accessRights.iri is defined -%}
                     ,
                     "@id": {{ dataset.termsOfUse.accessRights.iri | tojson }}
                     {%- endif -%}
@@ -359,18 +356,18 @@
             {%- if dataset.isDescribedBy -%}
             {%- set metadata = dataset.isDescribedBy -%}
             ,
-            "ccmm:Dataset.isDescribedBy":{
+            "ccmm:Dataset.isDescribedBy": {
                 "@type": [
                     "dcat:CatalogRecord",
                     "ccmm:MetadataRecord"
                 ],
-                "ccmm:MetadataRecord.conformsToMetadataStandard": {
+                "ccmm:MetadataRecord.conformsToStandard": {
                     "@type": [
                         "dcterms:Standard",
                         "ccmm:ApplicationProfile"
                     ],
-                    "@id": {{ metadata.conformsToMetadataStandard.iri | tojson }}
-                    "ccmm:ApplicationProfile.label": {{ metadata.conformsToMetadataStandard.label | tojson }}
+                    "@id": {{ metadata.conformsToStandard.iri | tojson }},
+                    "ccmm:ApplicationProfile.label": {{ metadata.conformsToStandard.label | tojson }}
                 }
                 {%- if metadata.qualifiedRelations|length > 0 -%}
                 ,
@@ -397,7 +394,7 @@
                             "@type": [
                                 "foaf:Agent",
                                 "ccmm:Person",
-                                "prov:Person",
+                                "prov:Person"
                             ],
                             "ccmm:Agent.name": {{ contributor.name | tojson }}
                             {%- if contributor.email -%}
@@ -435,17 +432,23 @@
                             "@type": [
                                 "foaf:Agent",
                                 "ccmm:Person",
-                                "prov:Person",  
+                                "prov:Person"
                             ],
                             "ccmm:Agent.name": "unkn"
                         {%- endif %}
                     }{{ "," if not loop.last }}
                     {%- endfor %}
-                ]
+                ],
+                "ccmm:MetadataRecord.hasOriginalRepository": {
+                    "iri": "https://data.narodni-repozitar.cz",
+                    "@type": [
+                        "ccmm:Repository",
+                        "dcat:Catalog"
+                    ]
+                }
                     {%- endif -%}
-                {%- endif -%}
+                {%- endif %}
             }
-
             {%- if dataset.qualifiedRelations|length > 0 -%}
             ,
             "ccmm:Resource.qualifiedRelation": [
@@ -471,7 +474,7 @@
                         "@type": [
                             "foaf:Agent",
                             "ccmm:Person",
-                            "prov:Person",
+                            "prov:Person"
                         ],
                         "ccmm:Agent.name": {{ contributor.name | tojson }}
                         {%- if contributor.email -%}
@@ -513,7 +516,7 @@
                             "ccmm:Organization",
                             "prov:Organization"
                         ],
-                        "ccmm:Organization.alternateName": {{ qualifiedRelation.organization.name | tojson }}
+                        "ccmm:Organization.alternateName": {{ qualifiedRelation.organization.name | tojson }},
                         "@id": {{ qualifiedRelation.organization.iri | tojson }}
                     }
                     {%- else -%}
@@ -522,7 +525,7 @@
                         "@type": [
                             "foaf:Agent",
                             "ccmm:Person",
-                            "prov:Person",
+                            "prov:Person"
                         ],
                         "ccmm:Agent.name": "unkn"
                     }

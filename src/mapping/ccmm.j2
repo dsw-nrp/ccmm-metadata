@@ -177,11 +177,11 @@
           {%- set schemeIri = identifierItem.type._raw.urlPattern|replace("{$id}","") -%}
         {%- else -%}
           {%- set schemeIri = "https://doi.org/" ~ identifierItem.type._raw.doi -%}
-          {%- set iri = identifierItem.type._value|default("") -%}
+          {%- set iri = identifierItem.value._value|default("") -%}
         {%- endif -%}
       {%- elif identifierItem.type is defined and identifierItem.value is defined -%}
         {%- set iri = identifierItem.value._value|default("") -%}
-        {%- set schemaIri = identifierItem.type._value|default("") -%}
+        {%- set schemeIri = identifierItem.type._value|default("") -%}
         {%- set label = identifierItem.type._value|default("") -%}
         {%- set value = identifierItem.value._value|default("") -%}
       {%- endif -%}
@@ -189,7 +189,7 @@
         "iri": iri|default(""),
         "value": value|default(""),
         "inScheme": {
-          "iri": schemaIri|default(""),
+          "iri": schemeIri|default(""),
           "label": label|default("")
         }
       } -%}
@@ -281,6 +281,11 @@
 
     {# Time reference #}
     {%- set timeReferences = [] -%}
+    {%- set timeReference = {
+      "time":{},
+      "dateType":{}
+    } -%}
+    {%- set ns = namespace(dateCreated=false) -%}
 
     {# Time refernce - Collection period #}
     {%- if data.dmp.sharedResources.collections|length > 0 -%}
@@ -291,10 +296,6 @@
         {%- endif -%}
       {%- endfor -%}
       {%- set collection = collectionList[0] -%}
-      {%- set timeReference = {
-        "time":{},
-        "dateType":{}
-      } -%}
 
       {%- if collection -%}
         {# Time Interval #}
@@ -317,6 +318,7 @@
             "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Created",
             "label": "Date Created"
           }) -%}
+          {%- set ns.dateCreated = true -%}
           {%- do timeReferences.append(timeReference) -%}
         {# Time Reference - Date Creation Ended #}
         {%- elif collection.endDate._value is defined -%}
@@ -327,11 +329,24 @@
             "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Created",
             "label": "Date Created"
           }) -%}
+          {%- set ns.dateCreated = true -%}
           {%- do timeReferences.append(timeReference) -%}
         {%- endif -%}
       {%- endif -%}
     {%- endif -%}
-    
+
+    {# Assure at least one time reference - created #}
+    {%- if not ns.dateCreated -%}
+      {%- do timeReference.time.update({
+        "timeInstant": dc.doc.created_at|datetime_format("%Y-%m-%d")|default(""),
+      }) -%}
+      {%- do timeReference.dateType.update({
+        "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Created",
+        "label": "Date Created"
+      }) -%}
+      {%- do timeReferences.append(timeReference) -%}
+    {%- endif -%}
+
     {# Time refernce - Distribution Available #}
     {%- if datasetItem.distributions|length > 0 -%}
       {%- for distributionItem in datasetItem.distributions -%}
@@ -402,7 +417,8 @@
       {%- do dataset.update({"timeReferences": timeReferences|default("")}) -%}
     {%- endif -%}
 
-    {# Validation Result #}
+    {# Validation Result - in CCMM as separate document, we does not want to include #}
+    {#
     {%- if data.dmp.sharedResources.collections|length > 0 -%}
       {%- set collectionList = [] -%}
       {%- for collection in data.dmp.sharedResources.collections -%}
@@ -449,6 +465,7 @@
         {%- endif -%}
       {%- endif -%}
     {%- endif -%}
+    #}
 
     {# Distribution #}
     {%- set distributions = [] -%}
@@ -458,6 +475,11 @@
         "title": "",
         "downloadUrl": "",
         "accessUrl": "",
+        "byteSize": 0,
+        "format": {
+          "iri": "",
+          "label": ""
+        }
       } -%}
       {%- if distributionItem.name -%}
         {%- do distribution.update({"title": distributionItem.name._value|default("")}) -%}
@@ -470,8 +492,10 @@
         {%- endif -%}
         {%- if distributionItem.technicalAvailability.downloadUrl -%}
           {%- if distributionItem.technicalAvailability.downloadUrl._value.startswith("http")  -%}
+            {# Update the distribution with download URL and IRI - used for IRI in example #}
             {%- do distribution.update({
-              "downloadUrl": distributionItem.technicalAvailability.downloadUrl._value|default("")
+              "downloadUrl": distributionItem.technicalAvailability.downloadUrl._value|default(""),
+              "iri": distributionItem.technicalAvailability.downloadUrl._value|default("")
             }) -%}
           {%- endif -%}
         {%- endif -%}
@@ -495,12 +519,20 @@
               "label": format.name._raw.name
             }) -%}
           {%- elif format.name._value -%}
-            {%- do formats.append({"label": format.name._value}) -%}
+            {%- do formats.append({
+              "iri": "",
+              "label": format.name._value}) -%}
           {%- endif -%}
         {%- endif -%}
       {%- endfor -%}
       {%- if formats|length > 0 -%}
         {%- do distribution.update({"format": formats[0]|default("")}) -%} {# only one allowed #}
+      {%- else -%}
+        {%- do distribution.update({"format": {
+          "iri": "",
+          "label": ""
+        }
+        }) -%}
       {%- endif -%}
 
       {%- do distributions.append(distribution) -%}
@@ -514,8 +546,8 @@
     {%- set fundings = [] -%}
     {%- for projectItem in data.dmp.projects -%}
       {%- for fundingItem in projectItem.fundings -%}
+        {# Remove IRI since it is not used in example #}
         {%- set funding = {
-          "iri": fundingItem.uuid|default(""),
           "funder": "",
           "localIdentifier": "",
         } -%}
@@ -671,8 +703,14 @@
     {%- for distributionItem in datasetItem.distributions -%}
       {%- if distributionItem.technicalAvailability -%}
         {%- set termsOfUse = {
-          "accessRights": {},
-          "license": "",
+          "accessRights": {
+            "iri": "",
+            "label": "",
+          },
+          "license": {
+            "iri": "",
+            "label": "",
+          },
         } -%}
         {%- if distributionItem.technicalAvailability.accessMode._value == "open"  -%}
           {%- set accessRights = {
@@ -713,6 +751,8 @@
           {%- elif licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector -%}
             {%- do termsOfUse.update({"license": licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._value|default("")}) -%}
           {%- endif -%}
+        {%- else -%}
+
         {%- endif -%}
         {%- do termsOfUseList.append(termsOfUse) -%}
       {%- endif -%}
@@ -723,10 +763,10 @@
 
     {# Metadata #}
       {%- set metadata = {
-        "conformsToMetadataStandard": {},
+        "conformsToStandard": {},
         "qualifiedRelations": []
       } -%}
-      {%- do metadata.conformsToMetadataStandard.update({ 
+      {%- do metadata.conformsToStandard.update({ 
         "iri": "https://model.ccmm.cz/research-data/1.1.0",
         "label": "Czech Core Metadata Model for Research Data"
       }) -%}
@@ -800,9 +840,9 @@
     {%- if data.dmp.sharedResources.collections|length > 0  -%}
       {%- set collectionPersons = [] -%}
       {%- set collectionList = [] -%}
-      {%- for collection in data.dmp.sharedResources.collections -%}
-        {%- if collection.usedBy and (datasetItem.uuid in collection.usedBy) -%}
-          {%- do collectionList.append(collection) -%}
+      {%- for collectionItem in data.dmp.sharedResources.collections -%}
+        {%- if collectionItem.usedBy and (datasetItem.uuid in collectionItem.usedBy) -%}
+          {%- do collectionList.append(collectionItem) -%}
         {%- endif -%}
       {%- endfor -%}
       {%- set collection = collectionList[0] -%}
@@ -814,7 +854,9 @@
                 {%- if nonEquipmentCollection.initialCaptureMethod._value == "manual" -%}
                   {%- if nonEquipmentCollection.dataNonDigitalEntryResponsibleParty -%}
                     {%- if nonEquipmentCollection.dataNonDigitalEntryResponsibleParty|length > 0  -%}
-                      {%- do collectionPersons.extend(nonEquipmentCollection.dataNonDigitalEntryResponsibleParty) -%}
+                      {%- for party in nonEquipmentCollection.dataNonDigitalEntryResponsibleParty -%}
+                        {%- do collectionPersons.append(party) -%}
+                      {%- endfor -%}
                     {%- endif -%}
                   {%- endif -%}
                 {%- endif -%}
@@ -918,6 +960,7 @@
         }
       } -%}
       {%- do qualifiedRelations.append(qualifiedRelation) -%}
+      {%- do dataset.isDescribedBy.qualifiedRelations.append(qualifiedRelation) -%}
     {%- endif -%}
 
     {%- if qualifiedRelations|length > 0 -%}
