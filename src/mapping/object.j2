@@ -780,6 +780,8 @@
     {# Mapping [Ethical Legislation data] #}
     {%- if collection.isSubjectToEthicalReview._value is sameas true -%}
         {%- do collection.ethicalReview.update({
+            "ethicalCommitteeName": collectionItem.isSubjectToEthicalReview.ethicalCommitteeName|default(None),
+            "ethicalCommitteeApprovalNumber": collectionItem.isSubjectToEthicalReview.ethicalCommitteeApprovalNumber|default(None),
             "extensionOfReusedData": collectionItem.isSubjectToEthicalReview.extensionOfReusedData|default(None),
             "ethicalReviewLinkDocument": collectionItem.isSubjectToEthicalReview.ethicalReviewLinkDocument|default(None),
             "ethicalReviewDocument": collectionItem.isSubjectToEthicalReview.ethicalReviewDocument|default(None),
@@ -1946,7 +1948,7 @@
                 "isListedInCatalogue": swPackageItem.isListedInCatalogue|default(None),
             } -%}
             {%- if swPackage.isOpenLicense -%}
-                {%- if swPackage.isOpenLicense._value == "yesDecided" -%}
+                {%- if swPackage.isOpenLicense._value is sameas true -%}
                     {%- if swPackageItem.isOpenLicense.openLicense -%}
                         {%- do swPackage.update({
                             "openSourceLicense": swPackageItem.isOpenLicense.openLicense|default(None),
