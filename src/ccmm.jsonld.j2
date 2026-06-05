@@ -285,10 +285,10 @@
                 {%- endif -%}
                 {%- if relatedResource.type -%}
                     ,
-                    "dcterms:type": {
+                    "ccmm:Resource.hasResourceType": {
                         "@type": [
                             "skos:Concept",
-                            "ccmm:RelatedResourceType"
+                            "ccmm:ResourceType"
                         ],
                         "@id": {{ relatedResource.type.iri | tojson }},
                         "ccmm:Resource.label": {{ relatedResource.type.label | tojson }}

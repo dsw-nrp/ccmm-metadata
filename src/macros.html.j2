@@ -13,3 +13,35 @@
     }
 }
 {%- endmacro %}
+
+{%- macro identifierFAIRsharing(identifierItem) -%}
+    {%- set iri = "" -%}
+    {%- set schemeIri = "" -%}
+    {%- set label = "" -%} 
+    {%- set value = "" -%}
+    {%- if identifierItem.type is defined and identifierItem.type._raw is defined and identifierItem.value is defined -%}
+        {%- set label = identifierItem.type._raw.name|default("") -%}
+        {%- set value = identifierItem.value._value|default("") -%}
+        {%- if identifierItem.type._raw.urlPattern is defined and identifierItem.type._raw.urlPattern -%}
+            {%- set iri = identifierItem.type._raw.urlPattern|replace("{$id}",identifierItem.value._value|default("")) -%}
+            {%- set schemeIri = identifierItem.type._raw.urlPattern|replace("{$id}","") -%}
+        {%- else -%}
+            {%- set schemeIri = "https://doi.org/" ~ identifierItem.type._raw.doi|default("") -%}
+            {%- set iri = identifierItem.value._value|default("") -%}
+        {%- endif -%}
+    {%- elif identifierItem.type is defined and identifierItem.value is defined -%}
+        {%- set iri = identifierItem.value._value|default("") -%}
+        {%- set schemeIri = identifierItem.type._value|default("") -%}
+        {%- set label = identifierItem.type._value|default("") -%}
+        {%- set value = identifierItem.value._value|default("") -%}
+    {%- endif -%}
+    {%- set identifier = {
+    "iri": iri|default(""),
+    "value": value|default(""),
+    "inScheme": {
+        "iri": schemeIri|default(""),
+        "label": label|default("")
+    }
+    } -%}
+    {{ identifier | tojson }}
+{%- endmacro -%}

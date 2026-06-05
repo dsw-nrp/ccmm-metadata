@@ -170,32 +170,31 @@
       {%- set label = "" -%} 
       {%- set value = "" -%}
       {%- if identifierItem.type is defined and identifierItem.type._raw is defined and identifierItem.value is defined -%}
-        {%- set label = identifierItem.type._raw.name|default("") -%}
-        {%- set value = identifierItem.value._value|default("") -%}
-        {%- if identifierItem.type._raw.urlPattern is defined and identifierItem.type._raw.urlPattern -%}
-          {%- set iri = identifierItem.type._raw.urlPattern|replace("{$id}",identifierItem.value._value|default("")) -%}
-          {%- set schemeIri = identifierItem.type._raw.urlPattern|replace("{$id}","") -%}
-        {%- else -%}
-          {%- set schemeIri = "https://doi.org/" ~ identifierItem.type._raw.doi -%}
-          {%- set iri = identifierItem.value._value|default("") -%}
-        {%- endif -%}
+          {%- set label = identifierItem.type._raw.name|default("") -%}
+          {%- set value = identifierItem.value._value|default("") -%}
+          {%- if identifierItem.type._raw.urlPattern is defined and identifierItem.type._raw.urlPattern -%}
+              {%- set iri = identifierItem.type._raw.urlPattern|replace("{$id}",identifierItem.value._value|default("")) -%}
+              {%- set schemeIri = identifierItem.type._raw.urlPattern|replace("{$id}","") -%}
+          {%- else -%}
+              {%- set schemeIri = "https://doi.org/" ~ identifierItem.type._raw.doi|default("") -%}
+              {%- set iri = identifierItem.value._value|default("") -%}
+          {%- endif -%}
       {%- elif identifierItem.type is defined and identifierItem.value is defined -%}
-        {%- set iri = identifierItem.value._value|default("") -%}
-        {%- set schemeIri = identifierItem.type._value|default("") -%}
-        {%- set label = identifierItem.type._value|default("") -%}
-        {%- set value = identifierItem.value._value|default("") -%}
+          {%- set iri = identifierItem.value._value|default("") -%}
+          {%- set schemeIri = identifierItem.type._value|default("") -%}
+          {%- set label = identifierItem.type._value|default("") -%}
+          {%- set value = identifierItem.value._value|default("") -%}
       {%- endif -%}
       {%- set identifier = {
-        "iri": iri|default(""),
-        "value": value|default(""),
-        "inScheme": {
+      "iri": iri|default(""),
+      "value": value|default(""),
+      "inScheme": {
           "iri": schemeIri|default(""),
           "label": label|default("")
-        }
+      }
       } -%}
       {%- do identifiers.append(identifier) -%}
     {%- endfor -%}
-
     {%- if identifiers|length > 0 -%}
       {%- do dataset.update({"identifiers": identifiers| default([])}) -%}
     {%- else -%}
@@ -417,7 +416,7 @@
       {%- do dataset.update({"timeReferences": timeReferences|default("")}) -%}
     {%- endif -%}
 
-    {# Validation Result - in CCMM as separate document, we does not want to include #}
+    {# Validation Result - in CCMM as separate document, we do not want to include #}
     {#
     {%- if data.dmp.sharedResources.collections|length > 0 -%}
       {%- set collectionList = [] -%}
@@ -574,6 +573,29 @@
     {# Related Resources #}
     {%- set relatedResources = [] -%}
 
+    {# Related Resource - DMP describing the datasets #}
+    {%- if ccmmDmpId -%}
+      {%- set relatedResource = {
+        "uuid": ccmmDmpId.identifier|default(""),
+        "relationType": {},
+        "type": {},
+        "url": ccmmDmpId.identifier|default(""),
+        "title": "",
+      } -%}
+      {%- if dc.project.name -%}
+        {%- do relatedResource.update({"title": dc.project.name|default("")}) -%}
+      {%- endif -%}
+      {%- do relatedResource.type.update({
+        "iri": "https://vocabularies.coar-repositories.org/resource_types/c_ab20/",
+        "label": "data management plan"
+      }) -%}
+      {%- do relatedResource.relationType.update({
+        "iri": "https://vocabs.ccmm.cz/registry/codelist/RelationType/IsDescribedBy",
+        "label": "is described by"
+      }) -%}
+      {%- do relatedResources.append(relatedResource) -%}
+    {%- endif -%}
+
     {# Related Resource - Instrument for equipment collection #}
     {%- if data.dmp.sharedResources.collections|length > 0 -%}
       {%- set collectionList = [] -%}
@@ -593,6 +615,7 @@
                 "uuid": instrumentItem.uuid|default(""),
                 "relationType": {},
                 "type": {},
+                "url":"",
                 "title": "",
               } -%}
               {%- if instrumentItem.name -%}
@@ -634,6 +657,7 @@
           "uuid": dataStore.uuid|default(""),
           "relationType": {},
           "type": {},
+          "url":"",
           "title": "",
         } -%}
         {%- if dataStore.name -%}
@@ -672,8 +696,12 @@
           "uuid": tool.uuid|default(""),
           "relationType": {},
           "type": {},
+          "url":"",
           "title": "",
         } -%}
+        {%- if tool.identifier and tool.identifier.value -%}
+          {%- do relatedResource.update({"iri": tool.identifier._value|default("")}) -%}
+        {%- endif -%}
         {%- if tool.name -%}
           {%- do relatedResource.update({"title": tool.name._value|default("")}) -%}
         {%- endif -%}
@@ -690,6 +718,38 @@
           "iri": "https://vocabs.ccmm.cz/RelationType/en/page/Requires",
           "label": "requires"
         }) -%}
+        {%- if tool.hasAccessLink._value is sameas true -%}
+          {%- set identifierItem = tool.identifier -%}
+          {%- set iri = "" -%}
+          {%- set schemeIri = "" -%}
+          {%- set label = "" -%} 
+          {%- set value = "" -%}
+          {%- if identifierItem.type is defined and identifierItem.type._raw is defined and identifierItem.value is defined -%}
+              {%- set label = identifierItem.type._raw.name|default("") -%}
+              {%- set value = identifierItem.value._value|default("") -%}
+              {%- if identifierItem.type._raw.urlPattern is defined and identifierItem.type._raw.urlPattern -%}
+                  {%- set iri = identifierItem.type._raw.urlPattern|replace("{$id}",identifierItem.value._value|default("")) -%}
+                  {%- set schemeIri = identifierItem.type._raw.urlPattern|replace("{$id}","") -%}
+              {%- else -%}
+                  {%- set schemeIri = "https://doi.org/" ~ identifierItem.type._raw.doi|default("") -%}
+                  {%- set iri = identifierItem.value._value|default("") -%}
+              {%- endif -%}
+          {%- elif identifierItem.type is defined and identifierItem.value is defined -%}
+              {%- set iri = identifierItem.value._value|default("") -%}
+              {%- set schemeIri = identifierItem.type._value|default("") -%}
+              {%- set label = identifierItem.type._value|default("") -%}
+              {%- set value = identifierItem.value._value|default("") -%}
+          {%- endif -%}
+          {%- set identifier = {
+          "iri": iri|default(""),
+          "value": value|default(""),
+          "inScheme": {
+              "iri": schemeIri|default(""),
+              "label": label|default("")
+          }
+          } -%}
+        {%- endif -%}
+        {%- do relatedResource.update({"url": identifier.iri|default("")}) -%}
         {%- do relatedResources.append(relatedResource) -%}
       {%- endfor -%}
     {%- endif -%}
