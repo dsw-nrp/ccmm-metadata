@@ -1,16 +1,16 @@
 {
     "templateId": "ccmm-metadata",
     "organizationId": "dmp.eosc.cz",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "name": "Czech Core Metadata Model (CCMM)",
     "description": "Czech Core Metadata Model for Czech National Repository Platform",
     "license": "Apache-2.0",
-    "metamodelVersion": "17.1",
+    "metamodelVersion": "18.0",
     "allowedPackages": [
         {
             "orgId": "dmp.eosc.cz",
             "kmId": "czech-nrp-km",
-            "minVersion": "0.1.6",
+            "minVersion": "1.0.0",
             "maxVersion": null
         }
     ],

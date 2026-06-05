@@ -7,9 +7,9 @@
 {%- import "src/globals.j2" as globals with context -%}
 
 {#- CCMM variables -#}
-{%- set ccmmDescription = "This CCMM has been created using " ~ globals.fullName ~ " (" ~ globals.link ~ ") and is based on knowledge model " ~ ctx.package.name ~ " (" ~ [ctx.package.organizationId, ctx.package.kmId, ctx.package.version]|join(":") ~ "). The questionnaire used for this DMP is identified by UUID \"" ~ ctx.questionnaire.uuid ~ "\" within " ~ ctx.config.clientUrl ~ " " ~ globals.name ~ " instance." -%}
+{%- set ccmmDescription = "This CCMM has been created using " ~ globals.fullName ~ " (" ~ globals.link ~ ") and is based on knowledge model " ~ dc.pkg.name ~ " (" ~ [dc.pkg.organizationId, dc.pkg.kmId, dc.pkg.version]|join(":") ~ "). The questionnaire used for this DMP is identified by UUID \"" ~ dc.project.uuid ~ "\" within " ~ ctx.config.clientUrl ~ " " ~ globals.name ~ " instance." -%}
 {%- set ccmmDmpId = {
-  "identifier": ctx.config.clientUrl ~ "/projects/" ~ ctx.questionnaire.uuid,
+  "identifier": ctx.config.clientUrl ~ "/projects/" ~ dc.project.uuid,
   "type": "url"
 }
 -%}
@@ -971,7 +971,7 @@
 {%- endif -%}
 
 {%- set dmp = {
-  "title": ctx.questionnaire.name|default(""),
+  "title": dc.project.name|default(""),
   "description": ccmmDescription|default(""),
   "dmp_id": ccmmDmpId|default(""),
   "datasets": datasets|default([]),

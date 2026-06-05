@@ -42,14 +42,14 @@
         "document": {
             "uuid": ctx.document.uuid,
             "name": ctx.document.name,
-            "createdAt": ctx.document.createdAt,
+            "createdAt": ctx.document.created_at,
         },
         "project": {
-            "uuid": ctx.questionnaire.uuid,
-            "name": ctx.questionnaire.name,
-            "description": ctx.questionnaire.description,
-            "tags": ctx.questionnaire.projectTags,
-            "url": ctx.config.clientUrl ~ "/projects/" ~ ctx.questionnaire.uuid,
+            "uuid": ctx.project.uuid,
+            "name": ctx.project.name,
+            "description": ctx.project.description,
+            "tags": ctx.project.projectTags,
+            "url": ctx.config.clientUrl ~ "/projects/" ~ ctx.project.uuid,
         },
     },
 } -%}
@@ -333,7 +333,7 @@
         }) -%}
         {%- if dataset.isCompletePublished._value is sameas false -%}
             {%- do dataset.update({
-                "partialPublishedDetails": datasetItem.willBePublished.partialPublishedDetails|default(None),
+                "partialPublishedDetails": datasetItem.willBePublished.isCompletePublished.partialPublishedDetails|default(None),
             }) -%}
         {%- endif -%}
         {%- do dataset.update({
@@ -544,28 +544,28 @@
                 "usesReferencesToDigitalObjects": collectionItem.isPhysicalSamplesCollection.storesPhysicalSamples.usesReferencesToDigitalObjects|default(None),
                 "referencesToDigitalObjectsImplementation": None,
             }) -%}
-            {%- if collection.physicalSamplesStorage.isDepositedLongTerm._value is sameas true -%}
-                {%- do collection.physicalSamplesStorage.update({
+            {%- if collection.physicalSamplesCollection.physicalSamplesStorage.isDepositedLongTerm._value is sameas true -%}
+                {%- do collection.physicalSamplesCollection.physicalSamplesStorage.update({
                     "isLongTermRepositoryDifferent": collectionItem.isPhysicalSamplesCollection.storesPhysicalSamples.isDepositedLongTerm.isLongTermRepositoryDifferent|default(None),
                 }) -%}
-                {%- if collection.physicalSamplesStorage.isLongTermRepositoryDifferent._value is sameas true -%}
-                    {%- do collection.physicalSampleStorage.update({
+                {%- if collection.physicalSamplesCollection.physicalSamplesStorage.isLongTermRepositoryDifferent._value is sameas true -%}
+                    {%- do collection.physicalSamplesCollection.physicalSamplesStorage.update({
                         "repositoryNameDuringProject": collectionItem.isPhysicalSamplesCollection.storesPhysicalSamples.isDepositedLongTerm.isLongTermRepositoryDifferent.repositoryNameDuringProject|default(None),
                         "repositoryNameLongTerm": collectionItem.isPhysicalSamplesCollection.storesPhysicalSamples.isDepositedLongTerm.isLongTermRepositoryDifferent.repositoryNameLongTerm|default(None),
                     }) -%}
-                {%- elif collection.physicalSamplesStorage.isLongTermRepositoryDifferent._value is sameas false -%}
-                    {%- do collection.physicalSamplesStorage.update({
+                {%- elif collection.physicalSamplesCollection.physicalSamplesStorage.isLongTermRepositoryDifferent._value is sameas false -%}
+                    {%- do collection.physicalSamplesCollection.physicalSamplesStorage.update({
                         "repositoryNameDuringProject": collectionItem.isPhysicalSamplesCollection.storesPhysicalSamples.isDepositedLongTerm.repositoryNameDuringProject|default(None),
                     }) -%}
                 {%- endif -%}
-            {%- elif collection.physicalSamplesStorage.isDepositedLongTerm._value is sameas false -%}
-                {%- do collection.physicalSamplesStorage.update({
+            {%- elif collection.physicalSamplesCollection.physicalSamplesStorage.isDepositedLongTerm._value is sameas false -%}
+                {%- do collection.physicalSamplesCollection.physicalSamplesStorage.update({
                     "noDepositForLongTermReason": collectionItem.isPhysicalSamplesCollection.storesPhysicalSamples.isDepositedLongTerm.noDepositForLongTermReason|default(None),
                     "repositoryNameDuringProject": collectionItem.isPhysicalSamplesCollection.storesPhysicalSamples.isDepositedLongTerm.repositoryNameDuringProject|default(None),
                 }) -%}
             {%- endif -%}
-            {%- if collection.physicalSamplesStorage.usesReferencesToDigitalObjects._value is sameas true -%}
-                {% do collection.physicalSamplesStorage.update({
+            {%- if collection.physicalSamplesCollection.physicalSamplesStorage.usesReferencesToDigitalObjects._value is sameas true -%}
+                {% do collection.physicalSamplesCollection.physicalSamplesStorage.update({
                     "referencesToDigitalObjectsImplementation": collectionItem.isPhysicalSamplesCollection.storesPhysicalSamples.usesReferencesToDigitalObjects.referencesToDigitalObjectsImplementation|default(None),
                 }) -%}
             {%- endif -%}
@@ -641,17 +641,13 @@
             {%- if collection.sensitiveDataCollection.personalDataCollection.categoryGdpr._value == "special" -%}
                 {%- do collection.sensitiveDataCollection.personalDataCollection.update({
                     "categoryGdpr": collectionItem.isSensitiveDataCollection.isPersonalDataCollection.categoryGdpr.whichSpecial|list,
+                    "specialCategoryGdprExemption": collectionItem.isSensitiveDataCollection.isPersonalDataCollection.categoryGdpr.specialCategoryGdprExemption|default(None),
                 }) -%}
-                {%- for exceptionItem in collectionItem.isSensitiveDataCollection.isPersonalDataCollection.categoryGdpr.specialCategoryGdprExemptions -%}
+                {%- if collection.sensitiveDataCollection.personalDataCollection.specialCategoryGdprExemption._value == "other" -%}
                     {%- do collection.sensitiveDataCollection.personalDataCollection.update({
-                        "specialCategoryGdprExemption": exceptionItem.specialCategoryGdprExemption|default(None),
-                    }) -%}
-                    {%- if collection.sensitiveDataCollection.personalDataCollection.specialCategoryGdprExemption._value == "other" -%}
-                        {%- do collection.sensitiveDataCollection.personalDataCollection.update({
-                        "specialCategoryGdprExemption": exceptionItem.specialCategoryGdprExemption.other|default(None),
-                    }) -%}
-                    {%- endif -%}
-                {%- endfor -%}
+                    "specialCategoryGdprExemption": collectionItem.isSensitiveDataCollection.isPersonalDataCollection.categoryGdpr.specialCategoryGdprExemption.other|default(None),
+                }) -%}
+                {%- endif -%}
             {%- endif -%}
             {%- if collection.sensitiveDataCollection.personalDataCollection.isFullyAnonymized._value is sameas true -%}
                 {%- do collection.sensitiveDataCollection.personalDataCollection.update({
@@ -1354,6 +1350,11 @@
                 }) -%}
             {%- endif -%}
         {%- endif -%}
+        {%- if metadataSpecification.provenanceDocumented.provenanceDocumentedType._value == "other" -%}
+            {%- do metadataSpecification.provenanceDocumented.update({
+                "provenanceDocumentedType": metadataItem.isProvenanceDocumented.provenanceDocumentedType.other|default(None),
+            }) -%}
+        {%- endif -%}
     {%- elif metadataSpecification.isProvenanceDocumented._value is sameas false -%}
         {%- do metadataSpecification.update({
             "noProvenanceReason": metadataItem.isProvenanceDocumented.noProvenanceReason|default(None),
@@ -1546,6 +1547,7 @@
         {%- do preservationStrategy.longTermStorageAfterProject.update({
             "funder": preservationItem.usesLongTermStorageAfterProject.funder|default(None),
             "minimumLifeTimeYears": preservationItem.usesLongTermStorageAfterProject.minimumLifeTime|default(None),
+            "minimumLifeTimeOther": None,
             "isArchivalPeriodExtendable": preservationItem.usesLongTermStorageAfterProject.isArchivalPeriodExtendable|default(None),
             "archivalPeriodExtension": {},
             "noArchivalPeriodExtensionReason": None,

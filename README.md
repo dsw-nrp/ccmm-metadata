@@ -24,7 +24,8 @@ Contribute to the document template by adding new information, refining existing
 
 ## Changelog
 
-### 0.1.0
+### 1.0.0
 
-*Released*: X-X-X
+*Released*: 2026-XX-XX
+
 * Initial version for testing and further development
