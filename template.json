@@ -1,0 +1,166 @@
+{
+    "templateId": "ccmm-metadata",
+    "organizationId": "dmp.eosc.cz",
+    "version": "1.0.0",
+    "name": "Czech Core Metadata Model (CCMM)",
+    "description": "Czech Core Metadata Model for Czech National Repository Platform",
+    "license": "Apache-2.0",
+    "metamodelVersion": "18.0",
+    "allowedPackages": [
+        {
+            "orgId": "dmp.eosc.cz",
+            "kmId": "czech-nrp-km",
+            "minVersion": "1.0.0",
+            "maxVersion": null
+        }
+    ],
+    "formats": [
+    {
+      "uuid": "889566fd-c930-419b-9514-169211f357c5",
+      "name": "JSON-LD",
+      "icon": "fas fa-share-alt",
+      "steps": [
+        {
+          "name": "jinja",
+          "options": {
+            "template": "src/ccmm.jsonld.j2",
+            "content-type": "application/ld+json",
+            "extension": "jsonld"
+          }
+        }
+      ]
+    },
+    {
+      "uuid": "0369cf46-a50e-4be5-9656-7b17227c7818",
+      "name": "JSON",
+      "icon": "fas fa-globe",
+      "steps": [
+        {
+          "name": "jinja",
+          "options": {
+            "template": "src/ccmm.json.j2",
+            "content-type": "application/json",
+            "extension": "json"
+          }
+        }
+      ]
+    },
+    {
+      "uuid": "9c7d572e-c273-4323-97a4-ab38f943c33a",
+      "name": "Turtle",
+      "icon": "fas fa-share-alt",
+      "steps": [
+        {
+          "name": "jinja",
+          "options": {
+            "template": "src/ccmm.jsonld.j2",
+            "content-type": "application/ld+json",
+            "extension": "jsonld"
+          }
+        },
+        {
+          "name": "rdflib-convert",
+          "options": {
+            "from": "json-ld",
+            "to": "ttl"
+          }
+        }
+      ]
+    },
+    {
+      "uuid": "af4441a5-17af-4a48-91cb-635a4e43afad",
+      "name": "N3",
+      "icon": "fas fa-share-alt",
+      "steps": [
+        {
+          "name": "jinja",
+          "options": {
+            "template": "src/ccmm.jsonld.j2",
+            "content-type": "application/ld+json",
+            "extension": "jsonld"
+          }
+        },
+        {
+          "name": "rdflib-convert",
+          "options": {
+            "from": "json-ld",
+            "to": "n3"
+          }
+        }
+      ]
+    },
+    {
+      "uuid": "3799b5ef-3a85-4753-b500-250370bf642f",
+      "name": "RDF/XML",
+      "icon": "fas fa-share-alt",
+      "steps": [
+        {
+          "name": "jinja",
+          "options": {
+            "template": "src/ccmm.jsonld.j2",
+            "content-type": "application/ld+json",
+            "extension": "jsonld"
+          }
+        },
+        {
+          "name": "rdflib-convert",
+          "options": {
+            "from": "json-ld",
+            "to": "rdf/xml"
+          }
+        }
+      ]
+    },
+    {
+      "uuid": "bd8ec4b2-fbea-401f-a898-681fbb03f2be",
+      "name": "N-Triples",
+      "icon": "fas fa-share-alt",
+      "steps": [
+        {
+          "name": "jinja",
+          "options": {
+            "template": "src/ccmm.jsonld.j2",
+            "content-type": "application/ld+json",
+            "extension": "jsonld"
+          }
+        },
+        {
+          "name": "rdflib-convert",
+          "options": {
+            "from": "json-ld",
+            "to": "ntriples"
+          }
+        }
+      ]
+    },
+    {
+      "uuid": "5978ca10-433b-4c53-a810-f98841f497d0",
+      "name": "TriG",
+      "icon": "fas fa-share-alt",
+      "steps": [
+        {
+          "name": "jinja",
+          "options": {
+            "template": "src/ccmm.jsonld.j2",
+            "content-type": "application/ld+json",
+            "extension": "jsonld"
+          }
+        },
+        {
+          "name": "rdflib-convert",
+          "options": {
+            "from": "json-ld",
+            "to": "trig"
+          }
+        }
+      ]
+    }
+  ],
+  "_tdk": {
+    "version": "4.1.0",
+    "readmeFile": "README.md",
+    "files": [
+      "src/**/*"
+    ]
+  }
+}

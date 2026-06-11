@@ -1,0 +1,1045 @@
+{#- This file contains the mapping with dmp.eosc.cz:czech-nrp-km object -#}
+{%- import "src/mapping/prepare-data.j2" as json with context -%}
+{%- import "src/mapping/object.j2" as obj with context -%}
+{%- set dc = ctx|to_context_obj -%}
+{%- set data = obj.result -%}
+{%- import "src/macros.html.j2" as macros with context -%}
+{%- import "src/globals.j2" as globals with context -%}
+
+{#- CCMM variables -#}
+{%- set ccmmDescription = "This CCMM has been created using " ~ globals.fullName ~ " (" ~ globals.link ~ ") and is based on knowledge model " ~ dc.pkg.name ~ " (" ~ [dc.pkg.organizationId, dc.pkg.kmId, dc.pkg.version]|join(":") ~ "). The questionnaire used for this DMP is identified by UUID \"" ~ dc.project.uuid ~ "\" within " ~ ctx.config.clientUrl ~ " " ~ globals.name ~ " instance." -%}
+{%- set ccmmDmpId = {
+  "identifier": ctx.config.clientUrl ~ "/projects/" ~ dc.project.uuid,
+  "type": "url"
+}
+-%}
+
+{# Contributors #}
+{%- set contributors = [] -%}
+{%- if data.dmp.collaboration.contributors|length > 0 -%}
+  {%- for contributorItem in data.dmp.collaboration.contributors -%}
+    {%- set personObject = {
+      "uuid": contributorItem.uuid|default(""), 
+      "name": "",
+    } -%}
+    {%- if contributorItem.name -%}
+      {%- do personObject.update({"name": contributorItem.name._value}) -%}
+    {%- endif -%}
+    {%- if contributorItem.email -%}
+      {%- do personObject.update({"contactPoint": {}}) -%}
+      {%- do personObject.contactPoint.update({"email": contributorItem.email._value}) -%}
+    {%- endif -%}
+
+    {%- if contributorItem.orcid -%}
+      {%- do personObject.update({"identifier": {}}) -%}
+      {%- if contributorItem.orcid._raw -%}
+        {%- do personObject.identifier.update({
+          "uuid": contributorItem.uuid|default(""),
+          "iri": "https://orcid.org/" ~ contributorItem.orcid._raw["orcid-id"]|default(""),
+          "value": contributorItem.orcid._raw["orcid-id"]|default(""),
+          "inScheme": {
+            "iri": "https://orcid.org/",
+            "label": "ORCID",
+          },
+        }) -%}
+      {%- else -%}
+        {%- do personObject.identifier.update({
+          "uuid": contributorItem.uuid|default(""),
+          "iri": "https://orcid.org/" ~ contributorItem.orcid._value|default(""),
+          "value": contributorItem.orcid._value|default(""),
+          "inScheme": {
+            "iri": "https://orcid.org/",
+            "label": "ORCID",
+          },
+        }) -%}
+      {%- endif -%}
+    {%- endif -%}
+    {%- if contributorItem.affiliation -%}
+      {%- do personObject.update({"affiliation": {}}) -%}
+      {%- if contributorItem.affiliation._raw -%}
+        {% for name in contributorItem.affiliation._raw.names -%}
+          {% if "ror_display" in name.types %}
+            {%- do personObject.affiliation.update({"name": name.value|default("")}) -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- do personObject.affiliation.update({
+          "identifier": {
+            "iri": contributorItem.affiliation._raw.id|default(""),
+            "value": contributorItem.affiliation._raw.id|default("")| replace("https://ror.org/", ""),
+            "inScheme": {
+              "iri": "https://ror.org/",
+              "label": "ROR",
+            },
+          },
+        }) -%}
+      {%- else -%}
+        {%- do personObject.affiliation.update({
+          "name": contributorItem.affiliation._value|default(""),
+        }) -%}
+      {%- endif -%}
+    {%- endif -%}
+    {%- do contributors.append(personObject) -%}
+  {%- endfor -%}
+{%- endif -%}
+
+{# Organisation #}
+{%- set organisations = [] -%}
+{%- for projectItem in data.dmp.projects -%}
+  {%- for fundingItem in projectItem.fundings -%}
+    {%- if fundingItem.funder -%}
+      {%- set organisation = {} -%}
+      {% set org = namespace(nameDisplay="") %}
+      {%- if fundingItem.funder._raw -%}
+        {%- for name in fundingItem.funder._raw.names -%}
+          {% if "ror_display" in name.types -%}
+            {% set org.nameDisplay = name.value %}
+          {%- endif %}
+        {%- endfor %}
+        {%- do organisation.update({
+          "iri": fundingItem.funder._raw.id|default(""),
+          "funderId" : {
+            "iri": fundingItem.funder._raw.id|default(""),
+            "value": fundingItem.funder._raw.id|default("")|replace("https://ror.org/",""),
+            "inScheme": {
+              "iri": "https://ror.org/",
+              "label": "ROR"
+            }
+          },
+          "name": org.nameDisplay|default(""),
+        }) -%}
+      {%- else -%}
+        {%- do organisation.update({
+          "name": fundingItem.funder._value|default(""),
+        }) -%}
+        {%- do organisation.update({
+          "iri": fundingItem.funder.uuid|default(""),
+          "funderId" : {
+            "value": fundingItem.funder.uuid|default(""),
+            "iri": "urn:uuid:"~fundingItem.funder.uuid|default(""),
+            "inScheme": {
+              "iri": "urn:uuid:",
+              "label": "Universally Unique Identifier"
+            }
+          },
+          "name": fundingItem.funder.name|default(""),
+        }) -%}
+      {%- endif -%}
+      {%- do organisations.append(organisation) -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endfor -%}
+
+{# Datasets #}
+{%- set datasets = [] -%}
+{%- if data.dmp.datasets -%}
+  {%- for datasetItem in data.dmp.datasets -%}
+    {%- set dataset = {
+      "title": "",
+      "publicationYear": "",
+      "description": {},
+      "identifiers": [],
+      "subjects": [],
+      "termsOfUse": {},
+      "timeReferences": [],
+      "qualifiedRelations": [],
+      "isDescribedBy": []
+    } -%}
+
+    {# Title #}
+    {%- if datasetItem.name -%}
+      {%- do dataset.update({"title": datasetItem.name._value|default("")}) -%}
+    {%- endif -%}
+
+    {# Description #}
+    {%- if datasetItem.description -%}
+      {%- set description = {
+        "descriptionText": dc.project.replies.get(datasetItem.description._path).markdown_plain|default(""),
+        "descriptionType": {
+          "iri": "https://vocabs.ccmm.cz/DescriptionType/en/page/Other",
+          "label": "Other"
+        }
+      } -%}
+      {%- do dataset.update({"description": description|default("")}) -%}
+    {%- endif -%}
+
+    {# Identifiers #}
+    {%- set identifiers = [] -%}
+    {%- for identifierItem in datasetItem.identifiers | default([])-%}
+      {%- set iri = "" -%}
+      {%- set schemeIri = "" -%}
+      {%- set label = "" -%} 
+      {%- set value = "" -%}
+      {%- if identifierItem.type is defined and identifierItem.type._raw is defined and identifierItem.value is defined -%}
+          {%- set label = identifierItem.type._raw.name|default("") -%}
+          {%- set value = identifierItem.value._value|default("") -%}
+          {%- if identifierItem.type._raw.urlPattern is defined and identifierItem.type._raw.urlPattern -%}
+              {%- set iri = identifierItem.type._raw.urlPattern|replace("{$id}",identifierItem.value._value|default("")) -%}
+              {%- set schemeIri = identifierItem.type._raw.urlPattern|replace("{$id}","") -%}
+          {%- else -%}
+              {%- set schemeIri = "https://doi.org/" ~ identifierItem.type._raw.doi|default("") -%}
+              {%- set iri = identifierItem.value._value|default("") -%}
+          {%- endif -%}
+      {%- elif identifierItem.type is defined and identifierItem.value is defined -%}
+          {%- set iri = identifierItem.value._value|default("") -%}
+          {%- set schemeIri = identifierItem.type._value|default("") -%}
+          {%- set label = identifierItem.type._value|default("") -%}
+          {%- set value = identifierItem.value._value|default("") -%}
+      {%- endif -%}
+      {%- set identifier = {
+      "iri": iri|default(""),
+      "value": value|default(""),
+      "inScheme": {
+          "iri": schemeIri|default(""),
+          "label": label|default("")
+      }
+      } -%}
+      {%- do identifiers.append(identifier) -%}
+    {%- endfor -%}
+    {%- if identifiers|length > 0 -%}
+      {%- do dataset.update({"identifiers": identifiers| default([])}) -%}
+    {%- else -%}
+      {%- set identifier = {
+        "iri": "urn:uuid:"~datasetItem.uuid|default(""),
+        "value": datasetItem.uuid|default(""),
+        "inScheme": {
+          "iri": "urn:uuid:",
+          "label": "Universally Unique Identifier"
+        }
+      } -%}
+      {%- do identifiers.append(identifier) -%}
+      {%- do dataset.update({"identifiers": identifiers|default([])}) -%}
+    {%- endif -%}
+    {%- do dataset.update({"iri": identifiers[0].iri}) -%}
+
+    {# Language #}
+    {%- if datasetItem.language -%}
+      {%- if datasetItem.language._raw and datasetItem.language._raw.name -%}
+        {%- do dataset.update({"language": {"label": datasetItem.language._raw.name|default("")}}) -%}
+      {%- elif datasetItem.language._value -%}
+        {%- do dataset.update({"language": {"label": datasetItem.language._value|default("")}}) -%}
+      {%- endif -%}
+      {%- if datasetItem.language._raw and datasetItem.language._raw.code|length == 3 -%}
+        {%- do dataset.language.update({"iri": "http://publications.europa.eu/resource/authority/language/" ~ datasetItem.language._raw.code|default("")|upper}) -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    {# Resource Type #}
+    {%- if datasetItem.type -%}
+      {%- if datasetItem.type._raw -%}
+        {%- do dataset.update({"resourceType": {
+          "iri": "http://purl.org/coar/resource_type/" ~ datasetItem.type._raw.id|default(""),
+          "label": datasetItem.type._raw.label|default("")
+        }}) -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    {# Subject #}
+    {%- if datasetItem.keywords is defined -%}
+      {%- set subjects = [] -%}
+      {%- set ns = namespace(atLeastOneFrascati=false) -%}
+      {%- for keyword in datasetItem.keywords -%}
+        {%- set subject = {} -%}
+        {%- if keyword._raw -%}
+          {%- set ns.atLeastOneFrascati = true -%}
+          {%- do subject.update({
+            "title": keyword._raw.label_en|default(""),
+            "iri": "https://vocabs.ccmm.cz/registry/codelist/SubjectCategory/" ~ keyword._raw.slug|default(""),
+            "classificationCode": keyword._raw.id|default(""),
+            "inScheme": {
+              "iri": "https://vocabs.ccmm.cz/registry/codelist/SubjectCategory/",
+              "label": "OECD FORD Subject Category (Frascati)"
+            }
+          }) -%}
+        {%- else -%}
+          {%- do subject.update({
+            "title": keyword._value|default(""),
+            "iri": keyword.uuid|default(""),
+          }) -%}
+        {%- endif -%}
+        {%- do subjects.append(subject) -%}
+      {%- endfor -%}
+      {%- if ns.atLeastOneFrascati == false -%}
+        {%- set subject = {
+          "title": "",
+          "iri": "",
+          "inScheme": {
+            "iri": "https://vocabs.ccmm.cz/registry/codelist/SubjectCategory/",
+            "label": "OECD FORD Subject Category (Frascati)"
+          }
+        } -%}
+        {%- do subjects.append(subject) -%}
+      {%- endif -%}
+      {%- if subjects|length > 0 -%}
+        {%- do dataset.update({"subjects": subjects|default("")}) -%}
+      {%- else -%}
+        {%- do dataset.update({"subjects": [
+          {"title": ""}
+        ]}) -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    {# Time reference #}
+    {%- set timeReferences = [] -%}
+    {%- set timeReference = {
+      "time":{},
+      "dateType":{}
+    } -%}
+    {%- set ns = namespace(dateCreated=false) -%}
+
+    {# Time refernce - Collection period #}
+    {%- if data.dmp.sharedResources.collections|length > 0 -%}
+      {%- set collectionList = [] -%}
+      {%- for collection in data.dmp.sharedResources.collections -%}
+        {%- if collection.usedBy and (datasetItem.uuid in collection.usedBy) -%}
+          {%- do collectionList.append(collection) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- set collection = collectionList[0] -%}
+
+      {%- if collection -%}
+        {# Time Interval #}
+        {%- if collection.startDate._value is defined and collection.endDate._value is defined -%}
+          {%- do timeReference.time.update({
+            "startTime": collection.startDate._value|default(""),
+            "endTime": collection.endDate._value|default(""),
+          }) -%}
+          {%- do timeReference.dateType.update({
+            "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Collected",
+            "label": "Date Collected"
+          }) -%}
+          {%- do timeReferences.append(timeReference) -%}
+        {# Time Reference - Date Created #}
+        {%- elif collection.startDate._value is defined -%}
+          {%- do timeReference.time.update({
+            "timeInstant": collection.startDate._value|default(""),
+          }) -%}
+          {%- do timeReference.dateType.update({
+            "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Created",
+            "label": "Date Created"
+          }) -%}
+          {%- set ns.dateCreated = true -%}
+          {%- do timeReferences.append(timeReference) -%}
+        {# Time Reference - Date Creation Ended #}
+        {%- elif collection.endDate._value is defined -%}
+          {%- do timeReference.time.update({
+            "timeInstant": collection.endDate._value|default(""),
+          }) -%}
+          {%- do timeReference.dateType.update({
+            "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Created",
+            "label": "Date Created"
+          }) -%}
+          {%- set ns.dateCreated = true -%}
+          {%- do timeReferences.append(timeReference) -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    {# Assure at least one time reference - created #}
+    {%- if not ns.dateCreated -%}
+      {%- do timeReference.time.update({
+        "timeInstant": dc.doc.created_at|datetime_format("%Y-%m-%d")|default(""),
+      }) -%}
+      {%- do timeReference.dateType.update({
+        "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Created",
+        "label": "Date Created"
+      }) -%}
+      {%- do timeReferences.append(timeReference) -%}
+    {%- endif -%}
+
+    {# Time refernce - Distribution Available #}
+    {%- if datasetItem.distributions|length > 0 -%}
+      {%- for distributionItem in datasetItem.distributions -%}
+        {%- if distributionItem.whenAvailable -%}
+          {%- set timeReference = {
+            "time":{},
+            "dateType":{}
+          } -%}
+          {%- if distributionItem.name._value is defined -%}
+            {%- set label = "Availability of the distribution " ~ distributionItem.name._value -%}
+          {%- else -%}
+            {%- set label = "Availability of distribution" -%}
+          {%- endif -%}
+          {%- if distributionItem.whenAvailable.isAvailableImmediately._value is sameas false and distributionItem.whenAvailable.endDate._value is defined -%}
+            {%- if distributionItem.whenAvailable.postponedAvailability -%}
+              {%- if distributionItem.whenAvailable.postponedAvailability.exactStartDate and distributionItem.whenAvailable.postponedAvailability.exactStartDate._value -%}
+                {%- do timeReference.time.update({
+                  "startTime": distributionItem.whenAvailable.postponedAvailability.exactStartDate._value|default(""),
+                  "endTime": distributionItem.whenAvailable.endDate._value|default("")
+                }) -%}
+                {%- do timeReference.dateType.update({
+                  "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Available",
+                  "label": label
+                }) -%}
+                {%- do timeReferences.append(timeReference) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- elif distributionItem.whenAvailable.isAvailableImmediately._value is sameas false -%}
+            {%- if distributionItem.whenAvailable.postponedAvailability -%}
+              {%- if distributionItem.whenAvailable.postponedAvailability.exactStartDate and distributionItem.whenAvailable.postponedAvailability.exactStartDate._value -%}
+                {%- do timeReference.time.update({
+                  "timeInstant": distributionItem.whenAvailable.postponedAvailability.exactStartDate._value|default(""),
+                }) -%}
+                {%- do timeReference.dateType.update({
+                  "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Available",
+                  "label": label
+                }) -%}
+                {%- do timeReferences.append(timeReference) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endif -%}
+
+    {# Time Reference - Issued Date and Publication Year #}
+    {%- if datasetItem.issueDate -%}
+      {%- set timeReference = {
+        "time":{
+          "timeInstant": datasetItem.issueDate._value|default(""),
+        },
+        "dateType":{
+          "iri": "https://vocabs.ccmm.cz/TimeReference/en/page/Issued",
+          "label": "Date Issued"
+        }
+      } -%}
+      {%- do timeReferences.append(timeReference) -%}
+
+      {# Publication Year #}
+      {%- set date = datasetItem.issueDate._value|default("") -%}
+      {%- set year = date.split("-")[0] if "-" in date else "" -%}
+      {%- if year != "" -%}
+        {%- do dataset.update({"publicationYear": year|default("")}) -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    {%- if timeReferences|length > 0 -%}
+      {%- do dataset.update({"timeReferences": timeReferences|default("")}) -%}
+    {%- endif -%}
+
+    {# Validation Result - in CCMM as separate document, we do not want to include #}
+    {#
+    {%- if data.dmp.sharedResources.collections|length > 0 -%}
+      {%- set collectionList = [] -%}
+      {%- for collection in data.dmp.sharedResources.collections -%}
+        {%- if collection.usedBy and (datasetItem.uuid in collection.usedBy) -%}
+          {%- do collectionList.append(collection) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- set collection = collectionList[0] -%}
+      {%- if collection -%}
+        {%- if collection.isEquipmentCollection -%}
+          {%- if collection.isEquipmentCollection._value is sameas true -%}
+            {%- if collection.equipmentCollection.usesQualityProcesses -%}
+              {%- if collection.equipmentCollection.usesQualityProcesses._value is sameas true -%}
+                {%- set validationResults = {
+                  "label": "",
+                  "description": "",
+                } -%}
+                {%- set processMap = {
+                  "calibration": "Calibration of equipment",
+                  "repeatSamples": "Repeat samples",
+                  "standardizedMethods": "Standardized methods",
+                  "dataEntryValidation": "Data entry validation",
+                  "dataPeerReview": "Peer review",
+                  "usesControlledVocabularies": "Controlled vocabularies",
+                  "knownOutcomeSamples": "Known outcome samples"
+                } -%}
+                {%- set enabledProcesses = [] -%}
+                {%- for key, label in processMap.items() -%}
+                  {%- if collection.equipmentCollection.qualityProcesses[key]._value is sameas true -%}
+                    {%- do enabledProcesses.append(label) -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                {%- if collection.equipmentCollection.qualityProcesses.otherQualityProcesses._value -%}
+                  {%- do enabledProcesses.append(collection.equipmentCollection.qualityProcesses.otherQualityProcesses._value) -%}
+                {%- endif -%}
+                {%- if enabledProcesses|length > 0 -%}
+                  {%- do validationResults.update({"description": enabledProcesses|join(", ")}) -%}
+                  {%- do validationResults.update({"label": "Quality Processes"}) -%}
+                  {%- do dataset.update({"validationResult": validationResults|default("")}) -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+    #}
+
+    {# Distribution #}
+    {%- set distributions = [] -%}
+    {%- for distributionItem in datasetItem.distributions -%}
+      {%- set distribution = {
+        "iri": distributionItem.uuid|default(""),
+        "title": "",
+        "downloadUrl": "",
+        "accessUrl": "",
+        "byteSize": 0,
+        "format": {
+          "iri": "",
+          "label": ""
+        }
+      } -%}
+      {%- if distributionItem.name -%}
+        {%- do distribution.update({"title": distributionItem.name._value|default("")}) -%}
+      {%- endif -%}
+      {%- if distributionItem.technicalAvailability and distributionItem.technicalAvailability.accessUrl -%}
+        {%- if distributionItem.technicalAvailability.accessUrl._value.startswith("http") -%}
+          {%- do distribution.update({
+            "accessUrl": distributionItem.technicalAvailability.accessUrl._value|default("")
+          }) -%}
+        {%- endif -%}
+        {%- if distributionItem.technicalAvailability.downloadUrl -%}
+          {%- if distributionItem.technicalAvailability.downloadUrl._value.startswith("http")  -%}
+            {# Update the distribution with download URL and IRI - used for IRI in example #}
+            {%- do distribution.update({
+              "downloadUrl": distributionItem.technicalAvailability.downloadUrl._value|default(""),
+              "iri": distributionItem.technicalAvailability.downloadUrl._value|default("")
+            }) -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- if distributionItem.dataVolume -%}
+        {%- if distributionItem.dataVolume.isLargeVolume -%}
+          {%- if distributionItem.dataVolume.isLargeVolume._value is sameas true and distributionItem.dataVolume.largeVolume.estimatedVolume -%}
+            {%- set volume = distributionItem.dataVolume.largeVolume.estimatedVolume._value -%}
+            {%- do distribution.update({"byteSize": (volume | int | default(0)) * 1000000000}) -%} 
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+
+      {# Formats #}
+      {%- set formats = [] -%}
+      {%- for format in distributionItem.formats -%}
+        {%- if format.name -%}
+          {%- if format.name._raw -%}
+            {%- do formats.append({
+              "iri": "https://fairsharing.org/" ~ format.name._raw.id,
+              "label": format.name._raw.name
+            }) -%}
+          {%- elif format.name._value -%}
+            {%- do formats.append({
+              "iri": "",
+              "label": format.name._value}) -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if formats|length > 0 -%}
+        {%- do distribution.update({"format": formats[0]|default("")}) -%} {# only one allowed #}
+      {%- else -%}
+        {%- do distribution.update({"format": {
+          "iri": "",
+          "label": ""
+        }
+        }) -%}
+      {%- endif -%}
+
+      {%- do distributions.append(distribution) -%}
+    {%- endfor -%}
+
+    {%- if distributions|length > 0 -%}
+      {%- do dataset.update({"distributions": distributions|default([])}) -%}
+    {%- endif -%}
+
+    {# Funding Resource #}
+    {%- set fundings = [] -%}
+    {%- for projectItem in data.dmp.projects -%}
+      {%- for fundingItem in projectItem.fundings -%}
+        {# Remove IRI since it is not used in example #}
+        {%- set funding = {
+          "funder": "",
+          "localIdentifier": "",
+        } -%}
+        {%- if fundingItem.grantId -%}
+          {%- do funding.update({"localIdentifier": fundingItem.grantId._value|default("")}) -%}
+        {%- endif -%}
+        {%- if fundingItem.funder -%}
+          {%- if fundingItem.funder._raw -%}
+            {%- do funding.update({"funder": fundingItem.funder._raw.id|default("")}) -%}
+          {%- else -%}
+            {%- do funding.update({"funder": fundingItem.funder.uuid|default("")}) -%}
+          {%- endif -%}
+        {%- endif -%}
+        {%- do fundings.append(funding) -%}
+      {%- endfor -%}
+    {%- endfor -%}
+    {%- if fundings|length > 0 -%}
+      {%- do dataset.update({"fundingResources": fundings|default([])}) -%}
+    {%- endif -%}
+
+    {# Provenance #}
+    {# Not as link to document in KM NRP #}
+
+    {# Related Resources #}
+    {%- set relatedResources = [] -%}
+
+    {# Related Resource - DMP describing the datasets #}
+    {%- if ccmmDmpId -%}
+      {%- set relatedResource = {
+        "uuid": ccmmDmpId.identifier|default(""),
+        "relationType": {},
+        "type": {},
+        "url": ccmmDmpId.identifier|default(""),
+        "title": "",
+      } -%}
+      {%- if dc.project.name -%}
+        {%- do relatedResource.update({"title": dc.project.name|default("")}) -%}
+      {%- endif -%}
+      {%- do relatedResource.type.update({
+        "iri": "https://vocabularies.coar-repositories.org/resource_types/c_ab20/",
+        "label": "data management plan"
+      }) -%}
+      {%- do relatedResource.relationType.update({
+        "iri": "https://vocabs.ccmm.cz/registry/codelist/RelationType/IsDescribedBy",
+        "label": "is described by"
+      }) -%}
+      {%- do relatedResources.append(relatedResource) -%}
+    {%- endif -%}
+
+    {# Related Resource - Instrument for equipment collection #}
+    {%- if data.dmp.sharedResources.collections|length > 0 -%}
+      {%- set collectionList = [] -%}
+      {%- for collection in data.dmp.sharedResources.collections -%}
+        {%- if collection.usedBy and (datasetItem.uuid in collection.usedBy) -%}
+          {%- do collectionList.append(collection) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- set collection = collectionList[0] -%}
+
+      {%- if collection -%}
+        {%- if collection.isEquipmentCollection is defined -%}
+          {%- if collection.isEquipmentCollection._value is sameas true -%}
+            {%- set instruments = collection.equipmentCollection.instruments -%}
+            {%- for instrumentItem in instruments -%}
+              {%- set relatedResource = {
+                "uuid": instrumentItem.uuid|default(""),
+                "relationType": {},
+                "type": {},
+                "url":"",
+                "title": "",
+              } -%}
+              {%- if instrumentItem.name -%}
+                {%- do relatedResource.update({"title": instrumentItem.name._value|default("")}) -%}
+              {%- endif -%}
+              {%- if instrumentItem.url -%}
+                {%- do relatedResource.update({"url": instrumentItem.url._value|default("")}) -%}
+              {%- endif -%}
+              {%- do relatedResource.type.update({
+                "iri": "https://vocabularies.coar-repositories.org/resource_types/c_5ce6/",
+                "label": "Software"
+              }) -%}
+              {%- do relatedResource.relationType.update({
+                "iri": "https://vocabs.ccmm.cz/registry/codelist/RelationType/IsCollectedBy",
+                "label": "is collected by"
+              }) -%}
+              {%- do relatedResources.append(relatedResource) -%}
+            {%- endfor -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    {# Related Resource - Data Storage Infrastructure #}
+    {%- if data.dmp.sharedResources.dataStores|length > 0 -%}
+      {%- set dataStoresList = [] -%}
+      {%- for dataStore in data.dmp.sharedResources.dataStores -%}
+        {%- for distributionItem in datasetItem.distributions -%}
+          {%- if dataStore.usedBy and (distributionItem.uuid in dataStore.usedBy) -%}
+            {%- do dataStoresList.append(dataStore) -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      
+      {%- set dataStoresList = dataStoresList | unique(attribute="uuid") -%}
+
+      {%- for dataStore in dataStoresList -%}
+        {%- set relatedResource = {
+          "uuid": dataStore.uuid|default(""),
+          "relationType": {},
+          "type": {},
+          "url":"",
+          "title": "",
+        } -%}
+        {%- if dataStore.name -%}
+          {%- if dataStore.name._raw -%}
+            {%- do relatedResource.update({"title": dataStore.name._raw.name|default("")}) -%}
+          {%- else -%}
+            {%- do relatedResource.update({"title": dataStore.name._value|default("")}) -%}
+          {%- endif -%}
+        {%- endif -%}
+        {%- if dataStore.url -%}
+          {%- do relatedResource.update({"url": dataStore.url._value|default("")}) -%}
+        {%- endif -%}
+        {%- do relatedResource.type.update({
+          "iri": "https://vocabularies.coar-repositories.org/resource_types/c_1632/",
+          "label": "Data Repository"
+        }) -%}
+        {%- do relatedResource.relationType.update({
+          "iri": "https://vocabs.ccmm.cz/RelationType/en/page/IsPublishedIn",
+          "label": "is published in"
+        }) -%}
+        {%- do relatedResources.append(relatedResource) -%}
+      {%- endfor -%}
+    {%- endif -%}
+
+    {# Related Resource - Tools required for data access and work #}
+    {%- if data.dmp.sharedResources.tools|length > 0 -%}
+      {%- set toolsList = [] -%}
+      {%- for tool in data.dmp.sharedResources.tools -%}
+        {%- if tool.usedBy and (datasetItem.uuid in tool.usedBy) -%}
+          {%- do toolsList.append(tool) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      
+      {%- for tool in toolsList -%}
+        {%- set relatedResource = {
+          "uuid": tool.uuid|default(""),
+          "relationType": {},
+          "type": {},
+          "url":"",
+          "title": "",
+        } -%}
+        {%- if tool.identifier and tool.identifier.value -%}
+          {%- do relatedResource.update({"iri": tool.identifier._value|default("")}) -%}
+        {%- endif -%}
+        {%- if tool.name -%}
+          {%- do relatedResource.update({"title": tool.name._value|default("")}) -%}
+        {%- endif -%}
+        {%- if tool.hasAccessLink._value is sameas true -%}
+          {%- if tool.identifier.type._raw and tool.identifier.type._raw.id == 709 -%}
+            {%- do relatedResource.update({"url": tool.identifier.value._value|default("")}) -%}
+          {%- endif -%}
+        {%- endif -%}
+        {%- do relatedResource.type.update({
+          "iri": "https://vocabularies.coar-repositories.org/resource_types/c_5ce6/",
+          "label": "Software"
+        }) -%}
+        {%- do relatedResource.relationType.update({
+          "iri": "https://vocabs.ccmm.cz/RelationType/en/page/Requires",
+          "label": "requires"
+        }) -%}
+        {%- if tool.hasAccessLink._value is sameas true -%}
+          {%- set identifierItem = tool.identifier -%}
+          {%- set iri = "" -%}
+          {%- set schemeIri = "" -%}
+          {%- set label = "" -%} 
+          {%- set value = "" -%}
+          {%- if identifierItem.type is defined and identifierItem.type._raw is defined and identifierItem.value is defined -%}
+              {%- set label = identifierItem.type._raw.name|default("") -%}
+              {%- set value = identifierItem.value._value|default("") -%}
+              {%- if identifierItem.type._raw.urlPattern is defined and identifierItem.type._raw.urlPattern -%}
+                  {%- set iri = identifierItem.type._raw.urlPattern|replace("{$id}",identifierItem.value._value|default("")) -%}
+                  {%- set schemeIri = identifierItem.type._raw.urlPattern|replace("{$id}","") -%}
+              {%- else -%}
+                  {%- set schemeIri = "https://doi.org/" ~ identifierItem.type._raw.doi|default("") -%}
+                  {%- set iri = identifierItem.value._value|default("") -%}
+              {%- endif -%}
+          {%- elif identifierItem.type is defined and identifierItem.value is defined -%}
+              {%- set iri = identifierItem.value._value|default("") -%}
+              {%- set schemeIri = identifierItem.type._value|default("") -%}
+              {%- set label = identifierItem.type._value|default("") -%}
+              {%- set value = identifierItem.value._value|default("") -%}
+          {%- endif -%}
+          {%- set identifier = {
+          "iri": iri|default(""),
+          "value": value|default(""),
+          "inScheme": {
+              "iri": schemeIri|default(""),
+              "label": label|default("")
+          }
+          } -%}
+        {%- endif -%}
+        {%- do relatedResource.update({"url": identifier.iri|default("")}) -%}
+        {%- do relatedResources.append(relatedResource) -%}
+      {%- endfor -%}
+    {%- endif -%}
+
+    {%- if relatedResources|length > 0 -%}
+      {%- do dataset.update({"relatedResources": relatedResources}) -%}
+    {%- endif -%}
+
+    {# Terms of Use (per distribution) #}
+    {%- set termsOfUseList = [] -%}
+    {%- for distributionItem in datasetItem.distributions -%}
+      {%- if distributionItem.technicalAvailability -%}
+        {%- set termsOfUse = {
+          "accessRights": {
+            "iri": "",
+            "label": "",
+          },
+          "license": {
+            "iri": "",
+            "label": "",
+          },
+        } -%}
+        {%- if distributionItem.technicalAvailability.accessMode._value == "open"  -%}
+          {%- set accessRights = {
+            "iri": "https://vocabularies.coar-repositories.org/access_rights/c_abf2/",
+            "label": "open access",
+          } -%}
+          {%- do termsOfUse.update({"accessRights": accessRights}) -%}
+        {%- elif distributionItem.technicalAvailability.accessMode._value == "shared" -%}
+          {%- set accessRights = {
+            "iri": "https://vocabularies.coar-repositories.org/access_rights/c_16ec/",
+            "label": "restricted access",
+          } -%}
+          {%- do termsOfUse.update({"accessRights": accessRights}) -%}
+        {%- elif distributionItem.technicalAvailability.accessMode._value == "closed" -%}
+          {%- set accessRights = {
+            "iri": "https://vocabularies.coar-repositories.org/access_rights/c_16ec/",
+            "label": "restricted access",
+          } -%}
+          {%- do termsOfUse.update({"accessRights": accessRights}) -%}
+        {%- endif -%}
+        {%- if distributionItem.licensing -%}
+          {%- set licensing = distributionItem.licensing  -%}
+          {%- if licensing.licenses|length > 0 -%}
+            {%- set licenseItem = licensing.licenses[0] -%} {# only one license allowed #}
+            {%- if licenseItem.license._raw -%}
+              {%- do termsOfUse.update({"license": {
+                "iri": licenseItem.license._raw.url|default(""),
+                "label": licenseItem.license._raw.name|default("")
+              }}) -%}
+              {%- do termsOfUse.update({"description": "Distribution " ~ distributionItem.name._value|default("") ~ " is under " ~ licenseItem.license._raw.name|default("")~"."}) -%}
+            {%- else -%}
+              {%- do termsOfUse.update({"license": {
+                "label": licenseItem.license._value|default("")
+              }}) -%}
+              {%- do termsOfUse.update({"description": "Distribution " ~ distributionItem.name._value|default("") ~ " is under " ~ licenseItem.license._value|default("")~"."}) -%}
+            {%- endif -%}
+            {# TODO chceck what is the value from license selector #}
+          {%- elif licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector -%}
+            {%- do termsOfUse.update({"license": licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._value|default("")}) -%}
+          {%- endif -%}
+        {%- else -%}
+
+        {%- endif -%}
+        {%- do termsOfUseList.append(termsOfUse) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if termsOfUseList|length > 0 -%}
+      {%- do dataset.update({"termsOfUse": termsOfUseList[0]|default({})}) -%} {# only one allowed #}
+    {%- endif -%}
+
+    {# Metadata #}
+      {%- set metadata = {
+        "conformsToStandard": {},
+        "qualifiedRelations": []
+      } -%}
+      {%- do metadata.conformsToStandard.update({ 
+        "iri": "https://model.ccmm.cz/research-data/1.1.0",
+        "label": "Czech Core Metadata Model for Research Data"
+      }) -%}
+
+      {%- do dataset.update({"isDescribedBy": metadata}) -%}
+
+    {# Qualified Relations #}
+    {%- set qualifiedRelations = [] -%}
+    {# Mandatory roles by CCMM #}
+    {%- set ns = namespace(
+      hasDataManager=false,
+      hasPublisher=false,
+      hasCreator=false
+    ) -%}
+
+    {# Contact person - we have for distribution, here is used for dataset #}
+    {%- if datasetItem.distributions|length > 0 -%}
+      {%- set contactPersons = [] -%}
+      {%- for distribution in datasetItem.distributions -%}
+        {%- if distribution.contactPerson -%}
+          {%- do contactPersons.append(distribution.contactPerson) -%}
+        {%- endif -%}
+      {%- endfor -%}
+
+      {%- if contactPersons|length > 0 -%}
+        {%- for contactPersonItem in contactPersons -%}
+          {%- set qualifiedRelation = {
+          "role": {
+            "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/ContactPerson",
+            "label": "Contact Person",
+          },
+          "person": contactPersonItem.uuid|default(""),
+        } -%}
+        {%- do qualifiedRelations.append(qualifiedRelation) -%}
+        {%- endfor -%}
+      {%- endif -%}
+    {%- endif -%}
+  
+    {# Publisher #}
+    {%- if datasetItem.hasPublisher -%}
+      {%- set ns.hasPublisher = true -%}
+      {%- set qualifiedRelation = {
+        "role": {
+          "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Publisher",
+          "label": "Publisher",
+        }
+      } -%}
+      {%- if datasetItem.hasPublisher._raw -%}
+        {% set org = namespace(nameDisplay="") %}
+        {%- for name in datasetItem.hasPublisher._raw.names -%}
+            {% if "ror_display" in name.types -%}
+                {% set org.nameDisplay = name.value %}
+            {%- endif %}
+        {%- endfor %}
+        {%- set organization = {
+          "name": org.nameDisplay|default(""),
+          "iri": datasetItem.hasPublisher._raw.id|default("")
+        } -%}
+        {%- do qualifiedRelation.update({"organization": organization}) -%}
+      {%- else -%}
+        {%- set organization = {
+          "name": datasetItem.hasPublisher._value|default(""),
+          "iri": datasetItem.hasPublisher.uuid|default("")
+        } -%}
+        {%- do qualifiedRelation.update({"organization": organization}) -%}
+      {%- endif -%}
+      {%- do qualifiedRelations.append(qualifiedRelation) -%}
+    {%- endif -%}
+
+    {# Data Collector - in case of nonEquipmentCollection who is repsponsible for digitalisation #}
+    {%- if data.dmp.sharedResources.collections|length > 0  -%}
+      {%- set collectionPersons = [] -%}
+      {%- set collectionList = [] -%}
+      {%- for collectionItem in data.dmp.sharedResources.collections -%}
+        {%- if collectionItem.usedBy and (datasetItem.uuid in collectionItem.usedBy) -%}
+          {%- do collectionList.append(collectionItem) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- set collection = collectionList[0] -%}
+      {%- if collection -%}
+        {%- if collection.isNonEquipmentCollection -%}
+          {%- if collection.isNonEquipmentCollection._value is sameas true -%}
+            {%- set nonEquipmentCollection = collection.nonEquipmentCollection -%}
+              {%- if nonEquipmentCollection.initialCaptureMethod -%}
+                {%- if nonEquipmentCollection.initialCaptureMethod._value == "manual" -%}
+                  {%- if nonEquipmentCollection.dataNonDigitalEntryResponsibleParty -%}
+                    {%- if nonEquipmentCollection.dataNonDigitalEntryResponsibleParty|length > 0  -%}
+                      {%- for party in nonEquipmentCollection.dataNonDigitalEntryResponsibleParty -%}
+                        {%- do collectionPersons.append(party) -%}
+                      {%- endfor -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endif -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+
+      {%- if collectionPersons|length > 0 -%}
+        {%- for collectionPersonItem in collectionPersons -%}
+          {%- set qualifiedRelation = {
+          "role": {
+            "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/DataCollector",
+            "label": "Data Collector",
+          },
+          "person": collectionPersonItem.uuid|default(""),
+        } -%}
+        {%- do qualifiedRelations.append(qualifiedRelation) -%}
+        {%- endfor -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    {# Role definitions mapping #}
+    {%- set roleVocabulary = {
+      "Project Manager": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/ProjectManager",
+      "Data Curator": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/DataCurator",
+      "Data Collector": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/DataCollector",
+      "Data Manager": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/DataManager",
+      "Distributor": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Distributor",
+      "Contact Person": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/ContactPerson",
+      "Editor": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Editor",
+      "Producer": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Producer",
+      "Project Leader": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/ProjectLeader",
+      "Project Member": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/ProjectMember",
+      "Researcher": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Researcher",
+      "Rights Holder": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/RightsHolder",
+      "Sponsor": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Sponsor",
+      "Supervisor": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Supervisor",
+      "Work Package Leader": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/WorkPackageLeader",
+      "Other": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Other"
+    } -%}
+
+    {# Qualified Relations - all contributors #}
+    {%- if data.dmp.collaboration.contributors|length > 0 -%}
+      {%- for contributor in data.dmp.collaboration.contributors -%}
+        {%- for defRole in contributor.roles -%}
+          {%- set role = {
+            "iri": roleVocabulary.get(defRole, "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Other"),
+            "label": defRole,
+          }-%}
+          {%- set qualifiedRelation = {
+            "role": role,
+            "person": contributor.uuid|default(""),
+          } -%}
+
+          {%- if defRole == "Data Manager" -%}
+            {%- set ns.hasDataManager = true -%}
+            {%- do dataset.isDescribedBy.qualifiedRelations.append(qualifiedRelation) -%}
+          {%- else -%}
+            {%- do qualifiedRelations.append(qualifiedRelation) -%}
+          {%- endif -%}
+        {%- endfor -%}
+
+        {%- if contributor.isCreator and contributor.isCreator._value is sameas true -%}
+          {%- set ns.hasCreator = true -%}
+          {%- set qualifiedRelation = {
+            "role": {
+              "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Creator",
+              "label": "Creator",
+            },
+            "person": contributor.uuid|default(""),
+          } -%}
+          {%- do qualifiedRelations.append(qualifiedRelation) -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endif -%}
+
+    {%- if ns.hasPublisher == false -%}
+      {%- set qualifiedRelation = {
+        "role": {
+          "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Publisher",
+          "label": "Publisher",
+        }
+      } -%}
+      {%- do qualifiedRelations.append(qualifiedRelation) -%}
+    {%- endif -%}
+    {%- if ns.hasCreator == false -%}
+      {%- set qualifiedRelation = {
+        "role": {
+          "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/Creator",
+          "label": "Creator",
+        }
+      } -%}
+      {%- do qualifiedRelations.append(qualifiedRelation) -%}
+    {%- endif -%}
+    {%- if ns.hasDataManager == false -%}
+      {%- set qualifiedRelation = {
+        "role": {
+          "iri": "https://vocabs.ccmm.cz/registry/codelist/AgentRole/Contributor/DataManager",
+          "label": "DataManager",
+        }
+      } -%}
+      {%- do qualifiedRelations.append(qualifiedRelation) -%}
+      {%- do dataset.isDescribedBy.qualifiedRelations.append(qualifiedRelation) -%}
+    {%- endif -%}
+
+    {%- if qualifiedRelations|length > 0 -%}
+      {%- do dataset.update({"qualifiedRelations": qualifiedRelations|default("")}) -%}
+    {%- endif -%}
+    {%- do datasets.append(dataset) -%}
+  {%- endfor -%}
+{%- endif -%}
+
+{%- set dmp = {
+  "title": dc.project.name|default(""),
+  "description": ccmmDescription|default(""),
+  "dmp_id": ccmmDmpId|default(""),
+  "datasets": datasets|default([]),
+  "entities": {
+    "contributors": contributors|default([]),
+    "organisations": organisations|default([]),
+  }
+} -%}
+
+{#- top-level CCMM object (according to the schema) -#}
+{%- set ccmm = { "dmp": dmp } -%}

@@ -1,0 +1,544 @@
+{%- import "src/mapping/ccmm.j2" as mapping with context -%}
+{%- set dmp = mapping.ccmm["dmp"] -%}
+{%- import "src/macros.html.j2" as macros with context -%}
+
+{
+    "@context": {
+        "dcterms": "http://purl.org/dc/terms/",
+        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+        "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+        "locn": "http://www.w3.org/ns/locn/",
+        "xsd": "http://www.w3.org/2001/XMLSchema#",
+        "foaf": "http://xmlns.com/foaf/0.1/",
+        "dcat": "http://www.w3.org/ns/dcat#",
+        "skos": "http://www.w3.org/2004/02/skos/core#",
+        "spdx": "http://spdx.org/rdf/terms#",
+        "vcard": "http://www.w3.org/2006/vcard/ns#",
+        "adms": "http://www.w3.org/ns/adms#",
+        "prov": "http://www.w3.org/ns/prov#",
+        "time": "http://www.w3.org/2006/time#",
+        "datacite": "https://model.ccmm.cz/vocabulary/datacite#",
+        "ccmmv": "https://model.ccmm.cz/vocabulary/ccmm#",
+        "ccmm": "https://model.ccmm.cz/research-data/"
+    }
+{%- if dmp.datasets|length > 0 -%}
+    ,
+    "@graph": [
+        {%- for dataset in dmp.datasets %}
+        {
+            "@id": {{ dataset.iri | tojson }},
+            "@type": [
+                "dcat:Dataset",
+                "ccmm:Dataset"
+            ]
+            {%- if dataset.title -%}
+            ,
+            "ccmm:Dataset.title": {{ dataset.title | tojson }}
+            {%- endif -%}
+            {%- if dataset.description -%}
+            ,
+            "ccmm:Dataset.hasDescription": [
+                {
+                    "@type": [
+                        "datacite:Description",
+                        "ccmm:Description"
+                    ]
+                {%- if dataset.description.descriptionText -%}
+                    ,
+                    "ccmm:Description.descriptionText": {{ dataset.description.descriptionText | tojson }}
+                {%- endif -%}
+                {%- if dataset.description.descriptionType -%}
+                    ,
+                    "ccmm:Description.hasDescriptionType": { 
+                        "@type": [
+                            "datacite:DescriptionType",
+                            "ccmm:DescriptionType"
+                        ],
+                        "@id": {{ dataset.description.descriptionType.iri | tojson }},
+                        "ccmm:DescriptionType.label": {{ dataset.description.descriptionType.label | tojson }}
+                    }
+                {%- endif %}
+                }
+            ]
+            {%- endif -%}
+            {%- if dataset.identifiers|length > 0 -%}
+            ,
+            "ccmm:Dataset.hasIdentifier": [
+            {%- for identifier in dataset.identifiers %}
+                {{ macros.identifier(identifier)| indent(16) }}{{ "," if not loop.last }}
+            {%- endfor %}
+            ]
+            {%- endif -%}
+            {%- if dataset.language -%}
+            ,
+            "ccmm:Dataset.hasPrimaryLanguage": {
+                "@type": [
+                    "dcterms:LinguisticSystem",
+                    "ccmm:LanguageSystem"
+                ],
+                {%- if dataset.language.iri %}
+                "@id": {{ dataset.language.iri | tojson }},
+                {%- endif %}
+                "ccmm:LanguageSystem.label": {{ dataset.language.label | tojson }}
+            }
+            {%- endif -%}
+            {%- if dataset.resourceType -%}
+            ,
+            "ccmm:Resource.hasResourceType": {
+                "@type": [
+                    "skos:Concept",
+                    "ccmm:ResourceType"
+                ],
+                {%- if dataset.resourceType.iri %}
+                "@id": {{ dataset.resourceType.iri | tojson }},
+                {%- endif %}
+                "ccmm:ResourceType.label": {{ dataset.resourceType.label | tojson }}
+            }
+            {%- endif -%}
+            {%- if dataset.subjects|length > 0 -%}
+            ,
+            "ccmm:Dataset.hasSubject": [
+                {%- for subject in dataset.subjects %}
+                {
+                    "@type": [
+                        "datacite:Subject",
+                        "ccmm:Subject"
+                    ],
+                    {%- if subject.iri %}
+                    "@id": {{ subject.iri | tojson }},
+                    {%- endif %}
+                    {%- if subject.classificationCode %}
+                    "ccmm:Subject.classificationCode": {{ subject.classificationCode | tojson }},
+                    {%- endif -%}
+                    {%- if subject.inScheme %}
+                    "ccmm:Subject.inSubjectScheme": {
+                        "@type": "ccmm:SubjectScheme",
+                        "@id": {{ subject.inScheme.iri | tojson }},
+                        "ccmm:SubjectScheme.label": {{ subject.inScheme.label | tojson }}
+                    },
+                    {%- endif %}
+                    "ccmm:Subject.title": {{ subject.title | tojson }}
+                }{{ "," if not loop.last }}
+                {%- endfor %}
+            ]
+            {%- endif -%}
+            {%- if dataset.timeReferences|length > 0 -%}
+            ,
+            "ccmm:Dataset.hasTimeReference": [
+                {%- for timeReference in dataset.timeReferences %}
+                {
+                    "@type": "ccmm:TimeReference"
+                    {%- if timeReference.dateType -%}
+                    ,
+                    "ccmm:TimeReference.hasDateType": {
+                        "@type": [
+                            "skos:Concept",
+                            "ccmm:DateType"
+                        ],
+                        "@id": {{ timeReference.dateType.iri | tojson }},
+                        "ccmm:DateType.label": {{ timeReference.dateType.label | tojson }}
+                    }
+                    {%- endif %}
+                    {%- if timeReference.time.timeInstant is defined -%}
+                    ,
+                    "ccmm:TimeReference.hasTemporalRepresentation": {
+                        "@type": [
+                            "skos:Concept",
+                            "ccmm:TimeRepresentation",
+                            "time:Instant",
+                            "ccmm:TimeInstant"
+                        ],
+                        "ccmm:TimeInstant.dateTime": {{ timeReference.time.timeInstant | tojson }}
+                    }
+                    {%- else -%}
+                    ,
+                    "ccmm:TimeReference.hasTemporalRepresentation": {
+                        "@type": [
+                            "skos:Concept",
+                            "ccmm:TimeRepresentation",
+                            "time:Interval",
+                            "ccmm:TimeInterval"
+                        ],
+                        "ccmm:TimeInterval.hasBeginning": {{ timeReference.time.startTime | tojson }},
+                        "ccmm:TimeInterval.hasEnd": {{ timeReference.time.endTime | tojson }}
+                    }
+                    {%- endif %}
+                }{{ "," if not loop.last }}
+                {%- endfor %}
+            ]
+            {%- endif -%}
+            {%- if dataset.validationResult -%}
+            ,
+            "ccmm:Dataset.hasValidationResult": {
+                "@type": "ccmm:ValidationResult"
+                {%- if dataset.validationResult.label -%}
+                ,
+                "ccmm:ValidationResult.label": {{ dataset.validationResult.label | tojson }}
+                {%- endif %}
+                {%- if dataset.validationResult.description -%}
+                ,
+                "datacite:description": {{ dataset.validationResult.description | tojson }}
+                {%- endif %}
+            }
+            {%- endif -%}
+            {%- if dataset.distributions -%}
+            ,
+            "ccmm:Dataset.hasDistribution": [
+                {%- for distribution in dataset.distributions %}
+                {
+                    "@id": {{ distribution.iri | tojson }},
+                    "@type": [
+                        "dcat:Distribution",
+                        "ccmm:Distribution",
+                        "ccmm:Distribution-DownloadableFile"
+
+                    ],
+                    "ccmm:Distribution.title": {{ distribution.title | tojson }},
+                    "ccmm:Distribution-DownloadableFile.accessUrl": {
+                        "@id": {{ distribution.accessUrl | tojson }}
+                    }
+                    {%- if distribution.downloadUrl -%}
+                    ,
+                    "ccmm:Distribution-DownloadableFile.downloadUrl": {
+                        "@id": {{ distribution.downloadUrl | tojson }}
+                    }
+                    {%- endif -%}
+                    {%- if distribution.byteSize is defined -%}
+                    ,
+                    "ccmm:Distribution-DownloadableFile.byteSize": {{ distribution.byteSize | tojson }}
+                    {%- endif -%}
+                    ,
+                    "ccmm:Distribution-DownloadableFile.hasFormat":
+                        {
+                            "@type": [
+                                "dcterms:MediaTypeOrExtent",
+                                "ccmm:Format"
+                            ],
+                            "ccmm:Format.label": {{ distribution.format.label | tojson }}
+                            {%- if distribution.format.iri -%}
+                            ,
+                            "@id": {{ distribution.format.iri | tojson }}
+                            {%- endif %}
+                        }
+                }{{ "," if not loop.last }}
+                {%- endfor %}
+            ]
+            {%- endif -%}
+            {%- if dataset.fundingResources|length > 0 -%}
+            ,
+            "ccmm:Dataset.hasFundingReference": [
+                {%- for fundingResource in dataset.fundingResources %}
+                {
+                    "@type": [
+                        "datacite:FundingReference",
+                        "ccmm:FundingReference"
+                    ]
+                    {%- if fundingResource.localIdentifier -%}
+                    ,
+                    "ccmm:FundingReference.localIdentifier": {{ fundingResource.localIdentifier | tojson }}
+                    {%- endif %}
+                    {%- if fundingResource.funder -%}
+                    ,
+                    "ccmm:FundingReference.hasFunder": [
+                        {%- set organisation = dmp.entities.organisations | selectattr("iri", "equalto", fundingResource.funder) | first -%}
+                        {%- if organisation %}
+                        {
+                            "@type": [
+                                "foaf:Agent",
+                                "ccmm:Agent",
+                                "prov:Organization",
+                                "ccmm:Organization"
+                            ],
+                            "ccmm:Agent.name": {{ organisation.name | tojson }}
+                            {%- if organisation.iri -%}
+                            ,
+                            "@id": {{ organisation.iri | tojson }}
+                            {%- endif %}
+                            {%- if organisation.funderId -%}
+                            ,
+                            "ccmm:Agent.hasIdentifier": {{ macros.identifier(organisation.funderId)| indent(28) }}
+                            {%- endif %}
+                        }
+                    ]
+                        {%- endif -%}
+                    {%- endif %}
+                }{{ "," if not loop.last }}
+                {%- endfor %}
+            ]
+            {%- endif %}
+            {%- if dataset.relatedResources|length > 0 -%}
+            ,
+            "ccmm:Dataset.hasRelatedResource": [
+            {%- for relatedResource in dataset.relatedResources %}
+                {
+                    "@type": [
+                        "rdf:Resource",
+                        "ccmm:RelatedResource"
+                    ]
+                {%- if relatedResource.title -%}
+                    ,
+                    "ccmm:Resource.title": {{ relatedResource.title | tojson }}
+                {%- endif -%}
+                {%- if relatedResource.url -%}
+                    ,
+                    "ccmm:RelatedResource.resourceURL": {{ relatedResource.url | tojson }}
+                {%- endif -%}
+                {%- if relatedResource.type -%}
+                    ,
+                    "ccmm:Resource.hasResourceType": {
+                        "@type": [
+                            "skos:Concept",
+                            "ccmm:ResourceType"
+                        ],
+                        "@id": {{ relatedResource.type.iri | tojson }},
+                        "ccmm:Resource.label": {{ relatedResource.type.label | tojson }}
+                    }
+                {%- endif -%}
+                {%- if relatedResource.relationType -%}
+                    ,
+                    "ccmm:Resource.hasResourceRelationType": {
+                        "@type": [
+                            "skos:Concept",
+                            "ccmm:ResourceRelationType"
+                        ],
+                        "@id": {{ relatedResource.relationType.iri | tojson }},
+                        "ccmm:ResourceRelationType.label": {{ relatedResource.relationType.label | tojson }}
+                    }
+                {%- endif %}
+                }{{ "," if not loop.last }}
+            {%- endfor %}
+            ]
+            {%- endif -%}
+            {%- if dataset.termsOfUse -%}
+            ,
+            "ccmm:Dataset.hasTermsOfUse": {
+                "@type": [
+                    "datacite:Rights",
+                    "ccmm:TermsOfUse"
+                ]
+                {%- if dataset.termsOfUse.license is defined -%}
+                ,
+                "dcterms:license": {
+                    {%- if dataset.termsOfUse.license.iri is defined %}
+                    "@id": {{ dataset.termsOfUse.license.iri | tojson }}
+                    {%- endif %}
+                    {%- if dataset.termsOfUse.license.label -%}
+                    ,
+                    "ccmm:LicenseDocument.label": {{ dataset.termsOfUse.license.label | tojson }}
+                    {%- endif -%}
+                    ,
+                    "@type": "ccmm:LicenseDocument"
+                }
+                {%- endif -%}
+                {%- if dataset.termsOfUse.accessRights is defined -%}
+                ,
+                "ccmm:TermsOfUse.accessRights": {
+                    "@type": [
+                        "datacite:Rights",
+                        "ccmm:TermsOfUse"
+                    ]
+                    {%- if dataset.termsOfUse.accessRights.iri is defined -%}
+                    ,
+                    "@id": {{ dataset.termsOfUse.accessRights.iri | tojson }}
+                    {%- endif -%}
+                    {%- if dataset.termsOfUse.accessRights.label -%}
+                    ,
+                    "ccmm:AccessRights.label": {{ dataset.termsOfUse.accessRights.label | tojson }}
+                    {%- endif %}
+                }
+                {%- endif -%}
+                {%- if dataset.termsOfUse.description -%}
+                ,
+                "datacite:description": {{ dataset.termsOfUse.description | tojson }}
+                {%- endif %}
+            }
+            {%- endif -%}
+            {%- if dataset.isDescribedBy -%}
+            {%- set metadata = dataset.isDescribedBy -%}
+            ,
+            "ccmm:Dataset.isDescribedBy": {
+                "@type": [
+                    "dcat:CatalogRecord",
+                    "ccmm:MetadataRecord"
+                ],
+                "ccmm:MetadataRecord.conformsToStandard": {
+                    "@type": [
+                        "dcterms:Standard",
+                        "ccmm:ApplicationProfile"
+                    ],
+                    "@id": {{ metadata.conformsToStandard.iri | tojson }},
+                    "ccmm:ApplicationProfile.label": {{ metadata.conformsToStandard.label | tojson }}
+                }
+                {%- if metadata.qualifiedRelations|length > 0 -%}
+                ,
+                "ccmm:MetadataRecord.qualifiedRelation": [
+                    {%- for qualifiedRelation in metadata.qualifiedRelations %}
+                    {
+                        "@type": "ccmm:ResourceToAgentRelationship"
+                        {%- if qualifiedRelation.role -%}
+                        ,
+                        "ccmm:ResourceToAgentRelationship.hadRole": {
+                            "@id": {{ qualifiedRelation.role.iri | tojson }},
+                            "ccmm:ResourceAgentRoleType.label": {{ qualifiedRelation.role.label | tojson }},
+                            "@type": [
+                                "skos:Concept",
+                                "ccmm:ResourceAgentRoleType"
+                            ]
+                        }
+                        {%- endif %}
+                        {%- if qualifiedRelation.person %}
+                            {%- for contributor in dmp.entities.contributors-%}
+                                {%- if contributor.uuid == qualifiedRelation.person -%}
+                        ,
+                        "ccmm:ResourceToAgentRelationship.hasRelatedAgent": {
+                            "@type": [
+                                "foaf:Agent",
+                                "ccmm:Person",
+                                "prov:Person"
+                            ],
+                            "ccmm:Agent.name": {{ contributor.name | tojson }}
+                            {%- if contributor.email -%}
+                            ,
+                            "ccmm:Agent.contactPoint": {
+                                "@type": "ccmm:ContactDetails",
+                                "ccmm:ContactDetails.email": {{ contributor.email | tojson }}
+                            }
+                            {%- endif -%}
+                            {%- if contributor.identifier -%}
+                            ,
+                            "@id": {{ contributor.identifier.iri | tojson }},
+                            "ccmm:Agent.hasIdentifier": {{ macros.identifier(contributor.identifier)| indent(28) }}
+                            {%- endif -%}
+                            {%- if contributor.affiliation -%}
+                            ,
+                            "ccmm:Person.hasAffiliation": {
+                                "@type": [
+                                    "foaf:Agent",
+                                    "ccmm:Organization",
+                                    "prov:Organization"
+                                ],
+                                "ccmm:Agent.name": {{ contributor.affiliation.name | tojson }}
+                                {%- if contributor.affiliation.identifier -%}
+                                ,
+                                "@id": {{ contributor.affiliation.identifier.iri | tojson }},
+                                "ccmm:Agent.hasIdentifier": {{ macros.identifier(contributor.affiliation.identifier)| indent(32) }}
+                                {%- endif %}
+                            }
+                            {%- endif %}
+                        }
+                            {%- endif %}
+                            {%- endfor %}
+                        {%- else -%}
+                        ,
+                        "ccmm:ResourceToAgentRelationship.hasRelatedAgent": {
+                            "@type": [
+                                "foaf:Agent",
+                                "ccmm:Person",
+                                "prov:Person"
+                            ],
+                            "ccmm:Agent.name": "unkn"
+                        }
+                        {%- endif %}
+                    }{{ "," if not loop.last }}
+                    {%- endfor %}
+                ],
+                "ccmm:MetadataRecord.hasOriginalRepository": {
+                    "iri": "https://data.narodni-repozitar.cz",
+                    "@type": [
+                        "ccmm:Repository",
+                        "dcat:Catalog"
+                    ]
+                }
+                    {%- endif -%}
+                {%- endif %}
+            }
+            {%- if dataset.qualifiedRelations|length > 0 -%}
+            ,
+            "ccmm:Resource.qualifiedRelation": [
+                {%- for qualifiedRelation in dataset.qualifiedRelations %}
+                {
+                    "@type": "ccmm:ResourceToAgentRelationship"
+                    {%- if qualifiedRelation.role -%}
+                    ,
+                    "ccmm:ResourceToAgentRelationship.hadRole": {
+                        "@id": {{ qualifiedRelation.role.iri | tojson }},
+                        "ccmm:ResourceAgentRoleType.label": {{ qualifiedRelation.role.label | tojson }},
+                        "@type": [
+                            "skos:Concept",
+                            "ccmm:ResourceAgentRoleType"
+                        ]
+                    }
+                    {%- endif %}
+                    {%- if qualifiedRelation.person %}
+                        {%- for contributor in dmp.entities.contributors-%}
+                            {%- if contributor.uuid == qualifiedRelation.person -%}
+                    ,
+                    "ccmm:ResourceToAgentRelationship.hasRelatedAgent": {
+                        "@type": [
+                            "foaf:Agent",
+                            "ccmm:Person",
+                            "prov:Person"
+                        ],
+                        "ccmm:Agent.name": {{ contributor.name | tojson }}
+                        {%- if contributor.email -%}
+                        ,
+                        "ccmm:Agent.contactPoint": {
+                            "@type": "ccmm:ContactDetails",
+                            "ccmm:ContactDetails.email": {{ contributor.email | tojson }}
+                        }
+                        {%- endif -%}
+                        {%- if contributor.identifier -%}
+                        ,
+                        "@id": {{ contributor.identifier.iri | tojson }},
+                        "ccmm:Agent.hasIdentifier": {{ macros.identifier(contributor.identifier)| indent(24) }}
+                        {%- endif -%}
+                        {%- if contributor.affiliation -%}
+                        ,
+                        "ccmm:Person.hasAffiliation": {
+                            "@type": [
+                                "foaf:Agent",
+                                "ccmm:Organization",
+                                "prov:Organization"
+                            ],
+                            "ccmm:Agent.name": {{ contributor.affiliation.name | tojson }}
+                            {%- if contributor.affiliation.identifier -%}
+                            ,
+                            "@id": {{ contributor.affiliation.identifier.iri | tojson }},
+                            "ccmm:Agent.hasIdentifier": {{ macros.identifier(contributor.affiliation.identifier)| indent(32) }}
+                            {%- endif %}
+                        }
+                        {%- endif %}
+                    }
+                        {%- endif %}
+                        {%- endfor %}
+                    {%- elif qualifiedRelation.organization -%}
+                    ,
+                    "ccmm:ResourceToAgentRelationship.hasRelatedAgent": {
+                        "@type": [
+                            "foaf:Agent",
+                            "ccmm:Organization",
+                            "prov:Organization"
+                        ],
+                        "ccmm:Organization.alternateName": {{ qualifiedRelation.organization.name | tojson }},
+                        "@id": {{ qualifiedRelation.organization.iri | tojson }}
+                    }
+                    {%- else -%}
+                    ,
+                    "ccmm:ResourceToAgentRelationship.hasRelatedAgent": {
+                        "@type": [
+                            "foaf:Agent",
+                            "ccmm:Person",
+                            "prov:Person"
+                        ],
+                        "ccmm:Agent.name": "unkn"
+                    }
+                    {%- endif %}
+                }{{ "," if not loop.last }}
+                {%- endfor %}
+            ]
+            {%- endif %}        
+        }{{ "," if not loop.last }}
+        {%- endfor %}
+    ]
+    {%- endif %}
+}
