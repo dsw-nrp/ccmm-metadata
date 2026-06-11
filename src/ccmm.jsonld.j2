@@ -429,12 +429,15 @@
                             {%- endif %}
                             {%- endfor %}
                         {%- else -%}
+                        ,
+                        "ccmm:ResourceToAgentRelationship.hasRelatedAgent": {
                             "@type": [
                                 "foaf:Agent",
                                 "ccmm:Person",
                                 "prov:Person"
                             ],
                             "ccmm:Agent.name": "unkn"
+                        }
                         {%- endif %}
                     }{{ "," if not loop.last }}
                     {%- endfor %}
