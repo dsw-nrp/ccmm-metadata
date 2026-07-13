@@ -809,7 +809,10 @@
             {%- endif -%}
             {# TODO chceck what is the value from license selector #}
           {%- elif licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector -%}
-            {%- do termsOfUse.update({"license": licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._value|default("")}) -%}
+            {%- do termsOfUse.update({"license": {
+              "label": licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._raw.name|default(""),
+              "iri": licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._raw.url|default("")
+            }}) -%}
           {%- endif -%}
         {%- else -%}
 
