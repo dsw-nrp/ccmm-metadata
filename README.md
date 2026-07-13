@@ -1,6 +1,10 @@
 # Czech Core Metadata Model 
 
-*The template is based on the [Czech Core Metadata Model (CCMM)](https://github.com/techlib/CCMM).*
+*The template is based on the [Czech Core Metadata Model (CCMM)](https://github.com/techlib/CCMM) designed for use in Data Stewardship Wizard with DSW Knowledge Model tailored to needs and specifics of Czech National Repository Platform for Research Data.*
+
+## Issues and Contributing
+
+This document template for DSW is available as open-source via GitHub Repository [dsw-nrp/ccmm-metadata](https://github.com/dsw-nrp/ccmm-metadata), you can [report issues](https://github.com/dsw-nrp/ccmm-metadata/issues) there and fork it for customizations or contributions.
 
 ## Maintainers
 
@@ -23,6 +27,12 @@ Contribute to the document template by adding new information, refining existing
 |-------------------------------------|---|
 
 ## Changelog
+
+### 1.0.1
+
+*Released*: 2026-07-13
+
+* Fix rendering license from License Selector tool
 
 ### 1.0.0
 
