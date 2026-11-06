@@ -57,6 +57,7 @@
     {%- if contributorItem.affiliation -%}
       {%- do personObject.update({"affiliation": {}}) -%}
       {%- if contributorItem.affiliation._raw -%}
+        {%- do personObject.affiliation.update({"name": contributorItem.affiliation._raw.name|default("")}) -%}
         {% for name in contributorItem.affiliation._raw.names -%}
           {% if "ror_display" in name.types %}
             {%- do personObject.affiliation.update({"name": name.value|default("")}) -%}
@@ -90,6 +91,7 @@
       {%- set organisation = {} -%}
       {% set org = namespace(nameDisplay="") %}
       {%- if fundingItem.funder._raw -%}
+        {%- set org.nameDisplay = fundingItem.funder._raw.name|default("") -%}
         {%- for name in fundingItem.funder._raw.names -%}
           {% if "ror_display" in name.types -%}
             {% set org.nameDisplay = name.value %}
@@ -748,8 +750,8 @@
               "label": label|default("")
           }
           } -%}
+          {%- do relatedResource.update({"url": identifier.iri|default("")}) -%}
         {%- endif -%}
-        {%- do relatedResource.update({"url": identifier.iri|default("")}) -%}
         {%- do relatedResources.append(relatedResource) -%}
       {%- endfor -%}
     {%- endif -%}
@@ -809,10 +811,16 @@
             {%- endif -%}
             {# TODO chceck what is the value from license selector #}
           {%- elif licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector -%}
-            {%- do termsOfUse.update({"license": {
-              "label": licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._raw.name|default(""),
-              "iri": licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._raw.url|default("")
-            }}) -%}
+            {%- if licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._raw -%}
+              {%- do termsOfUse.update({"license": {
+                "label": licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._raw.name|default(""),
+                "iri": licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._raw.url|default("")
+              }}) -%}
+            {%- else -%}
+              {%- do termsOfUse.update({"license": {
+                "label": licensing.notYetDecidedLicense.licenseBasedOnLicenseSelector._value|default("")
+              }}) -%}
+            {%- endif -%}
           {%- endif -%}
         {%- else -%}
 
@@ -878,7 +886,7 @@
         }
       } -%}
       {%- if datasetItem.hasPublisher._raw -%}
-        {% set org = namespace(nameDisplay="") %}
+        {% set org = namespace(nameDisplay=datasetItem.hasPublisher._raw.name|default("")) %}
         {%- for name in datasetItem.hasPublisher._raw.names -%}
             {% if "ror_display" in name.types -%}
                 {% set org.nameDisplay = name.value %}

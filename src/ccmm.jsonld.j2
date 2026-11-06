@@ -320,13 +320,11 @@
                 ,
                 "dcterms:license": {
                     {%- if dataset.termsOfUse.license.iri is defined %}
-                    "@id": {{ dataset.termsOfUse.license.iri | tojson }}
+                    "@id": {{ dataset.termsOfUse.license.iri | tojson }},
                     {%- endif %}
-                    {%- if dataset.termsOfUse.license.label -%}
-                    ,
-                    "ccmm:LicenseDocument.label": {{ dataset.termsOfUse.license.label | tojson }}
-                    {%- endif -%}
-                    ,
+                    {%- if dataset.termsOfUse.license.label %}
+                    "ccmm:LicenseDocument.label": {{ dataset.termsOfUse.license.label | tojson }},
+                    {%- endif %}
                     "@type": "ccmm:LicenseDocument"
                 }
                 {%- endif -%}
