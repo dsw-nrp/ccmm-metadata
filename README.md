@@ -28,6 +28,15 @@ Contribute to the document template by adding new information, refining existing
 
 ## Changelog
 
+### 1.0.2
+
+*Released*: 2026-11-06
+
+* Fix rendering projects with selected question tags, where the questions without these tags are missing
+* Fix rendering a license entered manually instead of selected from License Selector tool
+* Fix rendering a tool without an access link
+* Fix rendering an organization selected from an older ROR record
+
 ### 1.0.1
 
 *Released*: 2026-07-13
